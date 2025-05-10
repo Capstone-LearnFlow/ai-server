@@ -70,7 +70,7 @@ async def chat(request: ChatRequest):
     try:
         response = client.chat.completions.create(
             model=request.model,
-            messages=[message.dict() for message in request.messages]
+            messages=[message.model_dump() for message in request.messages]
         )
         return {"content": response.choices[0].message.content}
     except Exception as e:
@@ -169,14 +169,18 @@ async def review(request: ReviewRequest):
                 }
             },
             temperature=1,
-            max_tokens=2048,
+            max_completion_tokens=2048,
             top_p=1,
             frequency_penalty=0,
-            presence_penalty=0
+            presence_penalty=0,
+            store=True
         )
         
         # Extract and return the response
-        return {"data": response.choices[0].message.content}
+        # The response is in JSON format, so we need to parse it
+        import json
+        response_content = json.loads(response.choices[0].message.content)
+        return {"data": response_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
 
