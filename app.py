@@ -78,19 +78,25 @@ async def chat(request: ChatRequest):
 
 @app.post("/summary", response_model=SummaryResponse)
 async def summary(request: SummaryRequest):
-    try:
-        summaries = []
-        for content in request.contents:
-            prompt = f"Please summarize the following content into a very concise single sentence: {content}"
-            response = client.chat.completions.create(
+    import asyncio
+    async def get_summary(content):
+        prompt = f"Please summarize the following content into a very concise single sentence: {content}"
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
                 model="gpt-4.1-mini",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that provides very concise one-line summaries."},
                     {"role": "user", "content": prompt}
                 ]
             )
-            summaries.append(response.choices[0].message.content)
-        
+        )
+        return response.choices[0].message.content
+
+    try:
+        tasks = [get_summary(content) for content in request.contents]
+        summaries = await asyncio.gather(*tasks)
         return {"summaries": summaries}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating summaries: {str(e)}")
