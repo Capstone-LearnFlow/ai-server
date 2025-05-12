@@ -10,7 +10,6 @@ def example_chat():
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Hello! How are you?"}
         ],
-        "model": "gpt-4.1-mini"
     }
     response = requests.post(url, json=payload)
     print("/chat response:", response.json())
@@ -32,11 +31,11 @@ def example_review():
     url = f"{BASE_URL}/review"
     tree = {
         "id": "root",
-        "type": "subject",
+        "type": "주제",
         "child": [
             {
                 "id": "1",
-                "type": "claim",
+                "type": "주장",
                 "child": [],
                 "sibling": [],
                 "content": """최근에 정년 연장을 공론화한 곳은 행정안전부다. 이달 14일부터 행안부 소속 공무직 근로자의 정년이 60세에서 65세로 바뀌었다. 행안부 공무직은 기존 60세 정년을 맞은 해에 연장 신청을 하면 별도 심사를 거쳐 1964년생은 63세, 1965~1968년생은 64세, 1969년생부터는 65세로 정년이 늘어난다. 공무직은 국가나 지방자치단체에서 근무하는 민간 무기계약직 근로자다. 문재인 정부가 추진한 비정규직의 정규직화 과정에서 생겨난 직종으로 시설관리, 경비, 미화 등의 업무를 맡고 있다.
