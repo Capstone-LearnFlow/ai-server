@@ -28,7 +28,6 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: str = "gpt-4.1-mini"
 
 class ChatResponse(BaseModel):
     content: str
@@ -43,7 +42,7 @@ class SummaryResponse(BaseModel):
 # Models for /review endpoint
 class TreeNode(BaseModel):
     id: str
-    type: Literal["subject", "claim", "reason", "cargument", "question"]
+    type: Literal["주제", "주장", "근거", "반론", "질문"]
     child: List["TreeNode"] = []
     sibling: List["TreeNode"] = []
     content: str
@@ -72,7 +71,7 @@ class ReviewResponse(BaseModel):
 async def chat(request: ChatRequest):
     try:
         response = client.chat.completions.create(
-            model=request.model,
+            model="gpt-4.1-mini",
             messages=[message.model_dump() for message in request.messages]
         )
         return {"content": response.choices[0].message.content}
