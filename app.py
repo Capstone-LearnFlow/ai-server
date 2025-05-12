@@ -4,6 +4,9 @@ from typing import List, Dict, Any, Literal, Optional, Union
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
+import json
+import asyncio
+import uvicorn
 
 # Load environment variables
 load_dotenv()
@@ -78,17 +81,15 @@ async def chat(request: ChatRequest):
 
 @app.post("/summary", response_model=SummaryResponse)
 async def summary(request: SummaryRequest):
-    import asyncio
     async def get_summary(content):
-        prompt = f"Please summarize the following content into a very concise single sentence: {content}"
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
             lambda: client.chat.completions.create(
                 model="gpt-4.1-mini",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that provides very concise one-line summaries."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": "Summarize the following content into a very concise single sentence in Korean."},
+                    {"role": "user", "content": content}
                 ]
             )
         )
@@ -104,37 +105,25 @@ async def summary(request: SummaryRequest):
 @app.post("/review", response_model=ReviewResponse)
 async def review(request: ReviewRequest):
     try:
-        # Find the node with the requested ID
-        def find_node(node, node_id):
-            if node.id == node_id:
-                return node
-            
-            for child in node.child:
-                result = find_node(child, node_id)
-                if result:
-                    return result
-            
-            for sibling in node.sibling:
-                result = find_node(sibling, node_id)
-                if result:
-                    return result
-            
-            return None
-        
-        target_node = find_node(request.tree, request.review_request)
-        if not target_node:
-            raise HTTPException(status_code=404, detail="Node not found")
-        
+        # Serialize the entire tree
+        tree_json = request.tree.model_dump()
+        tree_str = json.dumps(tree_json, ensure_ascii=False, indent=2)
+        node_id = request.review_request
         # Prepare content for the prompt
-        node_content = target_node.content
-        node_context = f"Node type: {target_node.type}, Content: {node_content}"
-        
-        # Generate counterargument or question using OpenAI
+        prompt = (
+            "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
+            "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
+            "아래 트리 전체를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
+            "응답은 반드시 JSON 스키마에 맞춰주세요.\n"
+            f"[트리 구조]:\n{tree_str}\n"
+            f"[검토 대상 nodeId]: {node_id}"
+        )
+        print(prompt)
         response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[
-                {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions."},
-                {"role": "user", "content": f"Please review this statement and generate either a counterargument or a thought-provoking question: {node_context}"}
+                {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions in Korean."},
+                {"role": "user", "content": prompt}
             ],
             response_format={
                 "type": "json_schema",
@@ -174,22 +163,17 @@ async def review(request: ReviewRequest):
                     }
                 }
             },
-            temperature=1,
+            temperature=0.5,
             max_completion_tokens=2048,
             top_p=1,
             frequency_penalty=0,
             presence_penalty=0,
             store=True
         )
-        
-        # Extract and return the response
-        # The response is in JSON format, so we need to parse it
-        import json
         response_content = json.loads(response.choices[0].message.content)
         return {"data": response_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
