@@ -43,7 +43,7 @@ class SummaryResponse(BaseModel):
 # Models for /review endpoint
 class TreeNode(BaseModel):
     id: str
-    type: Literal["주제", "주장", "근거", "반론", "질문"]
+    type: Literal["주제", "주장", "근거", "반론", "질문", "답변"]
     child: List["TreeNode"] = []
     sibling: List["TreeNode"] = []
     content: str
@@ -54,7 +54,6 @@ class TreeNode(BaseModel):
 
 class ReviewRequest(BaseModel):
     tree: TreeNode
-    review_request: str  # nodeId
     review_num: int = 1  # Default to 1 if not provided
 
 class EvidenceNode(BaseModel):
@@ -109,8 +108,8 @@ async def summary(request: SummaryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating summaries: {str(e)}")
 
-# In-memory storage for previous trees
-previous_trees = {}
+# In-memory storage for previous tree
+previous_tree = None
 
 def find_node_by_id(tree: TreeNode, node_id: str) -> Optional[TreeNode]:
     """Find a node in the tree by its ID."""
@@ -326,42 +325,45 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
 @app.post("/review", response_model=ReviewResponse)
 async def review(request: ReviewRequest):
     try:
+        global previous_tree
         tree = request.tree
-        node_id = request.review_request
         review_num = request.review_num
         
         # Get current tree state as dictionary
         current_tree_dict = get_all_nodes(tree)
         
-        # Get the specific node being requested
-        requested_node = find_node_by_id(tree, node_id)
-        if not requested_node:
-            raise HTTPException(status_code=404, detail=f"Node with ID {node_id} not found in the tree")
-        
-        # Handle new reviews differently based on whether we have a previous tree
-        if node_id in previous_trees:
+        # Determine which nodes to review
+        if previous_tree:
             # Get previous tree state
-            previous_tree_dict = get_all_nodes(previous_trees[node_id])
+            previous_tree_dict = get_all_nodes(previous_tree)
             
             # Find new nodes
             new_nodes = find_new_nodes(current_tree_dict, previous_tree_dict)
             
             if not new_nodes:
-                # If no new nodes, generate a review for the requested node
-                new_nodes = [requested_node]
+                # If no new nodes, review root level nodes as fallback
+                new_nodes = [tree] + tree.child
         else:
-            # First time seeing this tree, just review the requested node
-            new_nodes = [requested_node]
+            # First time seeing any tree, review the main nodes
+            new_nodes = [tree] + tree.child
         
         # Generate reviews for new nodes in parallel
         review_tasks = [generate_review(node, tree) for node in new_nodes]
         reviews = await asyncio.gather(*review_tasks)
         
+        # Flatten the list of reviews if any are lists themselves
+        flattened_reviews = []
+        for review in reviews:
+            if isinstance(review, list):
+                flattened_reviews.extend(review)
+            else:
+                flattened_reviews.append(review)
+        
         # Rank the reviews and get the top ones
-        ranked_reviews = await rank_reviews(reviews, tree, review_num)
+        ranked_reviews = await rank_reviews(flattened_reviews, tree, review_num)
         
         # Store the current tree for future comparison
-        previous_trees[node_id] = deepcopy(tree)
+        previous_tree = deepcopy(tree)
         
         # Return the ranked reviews
         return {"data": ranked_reviews}
