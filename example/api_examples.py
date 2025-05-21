@@ -1,4 +1,6 @@
 import requests
+import json
+import time
 
 BASE_URL = "http://localhost:8000"
 
@@ -19,7 +21,7 @@ def example_summary():
     url = f"{BASE_URL}/summary"
     payload = {
         "contents": [
-            "Traders will get their first sense of the initial inflationary effects of the tariffs with the release of key inflation data this week. April’s Consumer Price Index (CPI) report is due Tuesday, followed by retail sales and the Producer Price Index (PPI) on Thursday.",
+            "Traders will get their first sense of the initial inflationary effects of the tariffs with the release of key inflation data this week. April's Consumer Price Index (CPI) report is due Tuesday, followed by retail sales and the Producer Price Index (PPI) on Thursday.",
             "Brent (BZ=F) traded around $64 a barrel, paring an advance in early Asian trading after last week notching up its first weekly gain in three, while West Texas Intermediate (CL=F) was near $61. After negotiations in Geneva, US Treasury Secretary Scott Bessent and Trade Representative Jamieson Greer said that they were upbeat on progress and would share more information on Monday, with the positive sentiment echoed by their Chinese counterparts."
         ]
     }
@@ -29,79 +31,177 @@ def example_summary():
 # Example for /review endpoint
 def example_review():
     url = f"{BASE_URL}/review"
-    tree = {
+    
+    # 초기 논증 트리 생성 - 주제와 주요 주장
+    # Initial argument tree - topic and main argument
+    initial_tree = {
         "id": "root",
         "type": "주제",
         "child": [
             {
-                "id": "1",
+                "id": "claim1",
                 "type": "주장",
                 "child": [],
                 "sibling": [],
-                "content": """최근에 정년 연장을 공론화한 곳은 행정안전부다. 이달 14일부터 행안부 소속 공무직 근로자의 정년이 60세에서 65세로 바뀌었다. 행안부 공무직은 기존 60세 정년을 맞은 해에 연장 신청을 하면 별도 심사를 거쳐 1964년생은 63세, 1965~1968년생은 64세, 1969년생부터는 65세로 정년이 늘어난다. 공무직은 국가나 지방자치단체에서 근무하는 민간 무기계약직 근로자다. 문재인 정부가 추진한 비정규직의 정규직화 과정에서 생겨난 직종으로 시설관리, 경비, 미화 등의 업무를 맡고 있다.
-
-대구시도 비슷한 방식으로 공무직 정년을 연장했다. 내년에 60세가 되는 1965년생 근로자 정년을 61세로 늘린 뒤 순차적으로 확대해 2029년에 근로자 정년을 65세로 조정하기로 했다. 이미 서울시 산하 기초지방자치단체 등도 정년을 65세로 연장했다. 몇몇 중앙 부처도 청소업 등 일부 업종에 한해 정년을 65세로 바꿨다. 60세가 넘은 근로자를 계약직 등으로 재고용하는 사업장 비중이 지난해 36%로 역대 최고를 기록하기도 했다. 해외에서도 정년 연장 움직임이 활발하다. 독일과 프랑스는 연금 수급 개시 연령 이상으로 정년을 설정할 수 있게 했고, 미국과 영국에선 정년 자체가 존재하지 않는다.
-
-정년 연장을 하면 기업 입장에선 숙련 근로자의 노하우를 잘 활용할 수 있게 된다. 젊은 직원들이 아무리 뛰어나도 30년 이상의 경험을 지닌 베테랑의 경륜을 넘어서긴 쉽지 않다. 고용 안정성을 강화해 근로 의욕을 높이는 동시에 노인 빈곤 문제를 해결할 방안이 될 수 있다.
-
-생산인구가 감소하는 한국에선 정년 연장이 필수라는 시각도 있다. 950만 명이 넘는 2차 베이비붐 세대(1964~1974년생)가 올해부터 차례대로 정년을 맞는다. 올해 퇴직하는 1964년생은 국민연금을 63세부터 받는데 이렇게 되면 3년의 소득 공백이 발생한다.
-
-2072년이 되면 생산인구(15~64세)는 2000만 명가량 급감한다. 이런 생산인구 절벽에 대응하기 위해 이중근 신임 대한노인회장은 노인 연령 기준을 65세에서 75세로 높이자고 제안했다.""",
-                "summary": "AI impact on education",
+                "content": "정년 연장은 고령화 사회에서 노동력 확보와 노인 빈곤 문제 해결에 도움이 된다.",
+                "summary": "정년 연장의 필요성",
                 "created_by": "user1",
                 "created_at": "2025-05-12T10:00:00Z",
                 "updated_at": "2025-05-12T10:00:00Z"
             }
         ],
         "sibling": [],
-        "content": "The future of technology",
-        "summary": "Tech future",
+        "content": "정년 연장에 관한 논의",
+        "summary": "정년 연장 논의",
         "created_by": "user1",
         "created_at": "2025-05-12T09:00:00Z",
         "updated_at": "2025-05-12T09:00:00Z"
     }
     
-    # First request - with default 1 review
+    # 첫 번째 요청 - 기본 1개 리뷰
+    # First request - default 1 review
+    print("\n==== 첫 번째 요청: 초기 트리, 기본 1개 리뷰 ====")
     payload1 = {
-        "tree": tree,
-        "review_request": "1"
+        "tree": initial_tree,
+        "review_request": "claim1"
     }
     response1 = requests.post(url, json=payload1)
-    print("/review response (default 1 review):", response1.json())
+    result1 = response1.json()
+    print(json.dumps(result1, ensure_ascii=False, indent=2))
     
-    # Second request - with 3 reviews
+    # 두 번째 요청 - 동일한 트리, 3개 리뷰 요청
+    # Second request - same tree, requesting 3 reviews
+    print("\n==== 두 번째 요청: 동일한 트리, 3개 리뷰 요청 ====")
     payload2 = {
-        "tree": tree,
-        "review_request": "1",
+        "tree": initial_tree,
+        "review_request": "claim1",
         "review_num": 3
     }
     response2 = requests.post(url, json=payload2)
-    print("/review response (3 reviews):", response2.json())
+    result2 = response2.json()
+    print(json.dumps(result2, ensure_ascii=False, indent=2))
     
-    # Third request - with modified tree (to test tree comparison)
-    # Add a new evidence node to the argument
-    tree["child"][0]["child"] = [
+    # 트리에 새로운 근거 노드 추가
+    # Add new evidence node to the tree
+    tree_with_evidence = json.loads(json.dumps(initial_tree))  # Deep copy
+    tree_with_evidence["child"][0]["child"] = [
         {
-            "id": "2",
+            "id": "evidence1",
             "type": "근거",
             "child": [],
             "sibling": [],
-            "content": "정년 연장은 고령화 시대에 사회보장 부담을 줄이고 전문 인력의 활용도를 높일 수 있는 방안이다.",
-            "summary": "정년 연장의 경제적 이점",
+            "content": "통계청 자료에 따르면 한국은 2025년부터 생산가능인구(15~64세)가 급격히 감소하여 2060년에는 현재의 약 65% 수준으로 줄어들 전망이다. 정년 연장은 이러한 인구구조 변화에 대응하는 필수적인 정책이다.",
+            "summary": "생산가능인구 감소 통계",
             "created_by": "user1",
-            "created_at": "2025-05-12T11:00:00Z",
-            "updated_at": "2025-05-12T11:00:00Z"
+            "created_at": "2025-05-12T11:30:00Z",
+            "updated_at": "2025-05-12T11:30:00Z"
         }
     ]
     
+    # 세 번째 요청 - 근거가 추가된 트리, 2개 리뷰 요청
+    # Third request - tree with added evidence, requesting 2 reviews
+    print("\n==== 세 번째 요청: 근거가 추가된 트리, 2개 리뷰 요청 ====")
     payload3 = {
-        "tree": tree,
-        "review_request": "1",
+        "tree": tree_with_evidence,
+        "review_request": "claim1",
         "review_num": 2
     }
     response3 = requests.post(url, json=payload3)
-    print("/review response (after tree update, 2 reviews):", response3.json())
-
+    result3 = response3.json()
+    print(json.dumps(result3, ensure_ascii=False, indent=2))
+    
+    # 트리에 새로운 반론 노드와 그에 대한 근거 추가
+    # Add a counterargument and its evidence to the tree
+    tree_with_counterargument = json.loads(json.dumps(tree_with_evidence))  # Deep copy
+    tree_with_counterargument["child"][0]["child"].append({
+        "id": "counter1",
+        "type": "반론",
+        "child": [
+            {
+                "id": "counter_evidence1",
+                "type": "근거",
+                "child": [],
+                "sibling": [],
+                "content": "정년 연장은 청년 일자리를 감소시키는 결과를 초래할 수 있다. 일본의 사례에서 보듯이 정년 연장 후 청년 실업률이 증가하는 경향이 나타났다.",
+                "summary": "청년 일자리 감소 우려",
+                "created_by": "user2",
+                "created_at": "2025-05-12T13:00:00Z",
+                "updated_at": "2025-05-12T13:00:00Z"
+            }
+        ],
+        "sibling": [],
+        "content": "정년 연장은 세대 간 일자리 갈등을 심화시킬 수 있으며, 조직의 신진대사를 저해할 우려가 있다.",
+        "summary": "정년 연장의 부작용",
+        "created_by": "user2",
+        "created_at": "2025-05-12T12:45:00Z",
+        "updated_at": "2025-05-12T12:45:00Z"
+    })
+    
+    # 네 번째 요청 - 반론이 추가된 트리, 2개 리뷰 요청
+    # Fourth request - tree with added counterargument, requesting 2 reviews
+    print("\n==== 네 번째 요청: 반론이 추가된 트리, 2개 리뷰 요청 ====")
+    payload4 = {
+        "tree": tree_with_counterargument,
+        "review_request": "claim1",
+        "review_num": 2
+    }
+    response4 = requests.post(url, json=payload4)
+    result4 = response4.json()
+    print(json.dumps(result4, ensure_ascii=False, indent=2))
+    
+    # 다섯 번째 요청 - 반론 노드에 대한 리뷰 요청
+    # Fifth request - requesting review for the counterargument node
+    print("\n==== 다섯 번째 요청: 반론 노드에 대한 리뷰 요청 ====")
+    payload5 = {
+        "tree": tree_with_counterargument,
+        "review_request": "counter1",
+        "review_num": 2
+    }
+    response5 = requests.post(url, json=payload5)
+    result5 = response5.json()
+    print(json.dumps(result5, ensure_ascii=False, indent=2))
+    
+    # 반론 노드에 대한 반론 추가 (반론의 반론)
+    # Add a counterargument to the counterargument
+    tree_with_nested_argument = json.loads(json.dumps(tree_with_counterargument))  # Deep copy
+    counter_node = next((node for node in tree_with_nested_argument["child"][0]["child"] if node["id"] == "counter1"), None)
+    if counter_node:
+        counter_node["child"].append({
+            "id": "counter_to_counter1",
+            "type": "반론",
+            "child": [
+                {
+                    "id": "counter_to_counter_evidence1",
+                    "type": "근거",
+                    "child": [],
+                    "sibling": [],
+                    "content": "정년 연장과 청년 일자리는 상충관계가 아닌 보완관계가 될 수 있다. 고령자의 경험과 청년의 새로운 아이디어가 결합하면 기업 경쟁력이 향상된다는 연구 결과가 있다.",
+                    "summary": "세대 간 상생 가능성",
+                    "created_by": "user1",
+                    "created_at": "2025-05-12T14:30:00Z",
+                    "updated_at": "2025-05-12T14:30:00Z"
+                }
+            ],
+            "sibling": [],
+            "content": "정년 연장과 청년 고용은 상충관계가 아니며, 세대 간 지식 전수와 멘토링을 통해 생산성을 높일 수 있다.",
+            "summary": "세대 간 상생 가능성",
+            "created_by": "user1",
+            "created_at": "2025-05-12T14:15:00Z",
+            "updated_at": "2025-05-12T14:15:00Z"
+        })
+    
+    # 여섯 번째 요청 - 복잡한 중첩 논증 구조에 대한 리뷰
+    # Sixth request - review for complex nested argumentation structure
+    print("\n==== 여섯 번째 요청: 복잡한 중첩 논증 구조, 2개 리뷰 요청 ====")
+    payload6 = {
+        "tree": tree_with_nested_argument,
+        "review_request": "counter1",
+        "review_num": 2
+    }
+    response6 = requests.post(url, json=payload6)
+    result6 = response6.json()
+    print(json.dumps(result6, ensure_ascii=False, indent=2))
+    
 if __name__ == "__main__":
     #example_chat()
     #example_summary()
