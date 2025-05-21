@@ -60,14 +60,49 @@ def example_review():
         "created_at": "2025-05-12T09:00:00Z",
         "updated_at": "2025-05-12T09:00:00Z"
     }
-    payload = {
+    
+    # First request - with default 1 review
+    payload1 = {
         "tree": tree,
         "review_request": "1"
     }
-    response = requests.post(url, json=payload)
-    print("/review response:", response.json())
+    response1 = requests.post(url, json=payload1)
+    print("/review response (default 1 review):", response1.json())
+    
+    # Second request - with 3 reviews
+    payload2 = {
+        "tree": tree,
+        "review_request": "1",
+        "review_num": 3
+    }
+    response2 = requests.post(url, json=payload2)
+    print("/review response (3 reviews):", response2.json())
+    
+    # Third request - with modified tree (to test tree comparison)
+    # Add a new evidence node to the argument
+    tree["child"][0]["child"] = [
+        {
+            "id": "2",
+            "type": "근거",
+            "child": [],
+            "sibling": [],
+            "content": "정년 연장은 고령화 시대에 사회보장 부담을 줄이고 전문 인력의 활용도를 높일 수 있는 방안이다.",
+            "summary": "정년 연장의 경제적 이점",
+            "created_by": "user1",
+            "created_at": "2025-05-12T11:00:00Z",
+            "updated_at": "2025-05-12T11:00:00Z"
+        }
+    ]
+    
+    payload3 = {
+        "tree": tree,
+        "review_request": "1",
+        "review_num": 2
+    }
+    response3 = requests.post(url, json=payload3)
+    print("/review response (after tree update, 2 reviews):", response3.json())
 
 if __name__ == "__main__":
-    example_chat()
-    example_summary()
+    #example_chat()
+    #example_summary()
     example_review()
