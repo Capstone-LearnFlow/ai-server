@@ -62,8 +62,7 @@ def example_review():
     # First request - default 1 review
     print("\n==== 첫 번째 요청: 초기 트리, 기본 1개 리뷰 ====")
     payload1 = {
-        "tree": initial_tree,
-        "review_request": "claim1"
+        "tree": initial_tree
     }
     response1 = requests.post(url, json=payload1)
     result1 = response1.json()
@@ -74,7 +73,6 @@ def example_review():
     print("\n==== 두 번째 요청: 동일한 트리, 3개 리뷰 요청 ====")
     payload2 = {
         "tree": initial_tree,
-        "review_request": "claim1",
         "review_num": 3
     }
     response2 = requests.post(url, json=payload2)
@@ -103,7 +101,6 @@ def example_review():
     print("\n==== 세 번째 요청: 근거가 추가된 트리, 2개 리뷰 요청 ====")
     payload3 = {
         "tree": tree_with_evidence,
-        "review_request": "claim1",
         "review_num": 2
     }
     response3 = requests.post(url, json=payload3)
@@ -142,24 +139,11 @@ def example_review():
     print("\n==== 네 번째 요청: 반론이 추가된 트리, 2개 리뷰 요청 ====")
     payload4 = {
         "tree": tree_with_counterargument,
-        "review_request": "claim1",
         "review_num": 2
     }
     response4 = requests.post(url, json=payload4)
     result4 = response4.json()
     print(json.dumps(result4, ensure_ascii=False, indent=2))
-    
-    # 다섯 번째 요청 - 반론 노드에 대한 리뷰 요청
-    # Fifth request - requesting review for the counterargument node
-    print("\n==== 다섯 번째 요청: 반론 노드에 대한 리뷰 요청 ====")
-    payload5 = {
-        "tree": tree_with_counterargument,
-        "review_request": "counter1",
-        "review_num": 2
-    }
-    response5 = requests.post(url, json=payload5)
-    result5 = response5.json()
-    print(json.dumps(result5, ensure_ascii=False, indent=2))
     
     # 반론 노드에 대한 반론 추가 (반론의 반론)
     # Add a counterargument to the counterargument
@@ -190,17 +174,16 @@ def example_review():
             "updated_at": "2025-05-12T14:15:00Z"
         })
     
-    # 여섯 번째 요청 - 복잡한 중첩 논증 구조에 대한 리뷰
-    # Sixth request - review for complex nested argumentation structure
-    print("\n==== 여섯 번째 요청: 복잡한 중첩 논증 구조, 2개 리뷰 요청 ====")
-    payload6 = {
+    # 다섯 번째 요청 - 복잡한 중첩 논증 구조, 2개 리뷰 요청
+    # Fifth request - complex nested argumentation structure, requesting 2 reviews
+    print("\n==== 다섯 번째 요청: 복잡한 중첩 논증 구조, 2개 리뷰 요청 ====")
+    payload5 = {
         "tree": tree_with_nested_argument,
-        "review_request": "counter1",
         "review_num": 2
     }
-    response6 = requests.post(url, json=payload6)
-    result6 = response6.json()
-    print(json.dumps(result6, ensure_ascii=False, indent=2))
+    response5 = requests.post(url, json=payload5)
+    result5 = response5.json()
+    print(json.dumps(result5, ensure_ascii=False, indent=2))
     
 if __name__ == "__main__":
     #example_chat()
