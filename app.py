@@ -108,8 +108,9 @@ async def summary(request: SummaryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating summaries: {str(e)}")
 
-# In-memory storage for previous tree
+# In-memory storage for previous tree and unselected reviews
 previous_tree = None
+unselected_reviews = []
 
 def find_node_by_id(tree: TreeNode, node_id: str) -> Optional[TreeNode]:
     """Find a node in the tree by its ID."""
@@ -385,40 +386,79 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
     tree_str = json.dumps(tree_json, ensure_ascii=False, indent=2)
     reviews_str = json.dumps(reviews, ensure_ascii=False, indent=2)
     
-    prompt = (
-        "다음은 논증 구조를 트리 형태로 표현한 JSON과 이에 대한 여러 반론/질문들입니다. "
-        "이러한 반론/질문들을 비판적 사고, 논리성, 관련성, 독창성 등을 기준으로 평가하여, "
-        f"가장 적절하다고 생각되는 {review_num}개를 선택해 주세요.\n\n"
-        f"[트리 구조]:\n{tree_str}\n\n"
-        f"[반론/질문 목록]:\n{reviews_str}\n\n"
-        f"Top {review_num}개의 반론/질문을 순위와 함께 JSON 배열 형태로 반환해주세요. 각 항목은 원래 반론/질문의 모든 정보를 포함해야 합니다."
-    )
+    system_content = [
+        {
+            "type": "text",
+            "text": "주어진 논증 구조를 트리 형태로 표현한 JSON과 반론/질문 목록을 평가하여 가장 우수한 항목의 순위를 매기세요.\n\n주어진 반론/질문은 비판적 사고, 논리성, 관련성, 독창성 등을 기준으로 종합적으로 평가해야 합니다. 평가를 바탕으로 반론/질문들을 정렬하고, 상위 n개의 순위를 도출하세요.\n\n# Steps\n\n1. **Input Parsing**: 수신된 JSON 형식의 논증 구조와 반론/질문 목록을 파싱합니다.\n2. **Critique and Evaluate**:\n   - 각 반론/질문에 대해 비판적 사고 적용 정도를 분석합니다.\n   - 논리적 구조와 일관성을 평가합니다.\n   - 논증과의 직접적 관련성을 검사합니다.\n   - 독창성과 새로운 관점을 평가합니다.\n3. **Scoring**: 위의 기준들을 종합하여 각 반론/질문의 점수를 산출합니다.\n4. **Ranking**: 점수에 따라 반론/질문을 정렬하고, 상위 n 개의 항목을 리스트업합니다.\n\n# Output Format\n\n출력은 상위 review_num개의 반론/질문에 대한 순위로, 각 항목에 대해 해당 순위를 숫자로 배열 형태로 제공합니다. \n\n예를 들어:\n```json\n{\n  \"ranked_reviews\": [3, 2, 5]\n}\n```\n여기서 숫자는 반론/질문의 인덱스를 나타냅니다.\n\n# Notes\n\n- 평가 기준을 균형 있게 고려하여 점수를 매기십시오.\n- 반론/질문이 논증과 직접적으로 관련이 없거나 독창성이 부족할 경우, 낮은 점수를 부여하십시오.\n- 입력 데이터는 유효한 포맷이어야 하며, 오류 검사를 포함하십시오."
+        }
+    ]
+    
+    user_content = f"[트리 구조]:\n{tree_str}\n\n[반론/질문 목록]:\n{reviews_str}\n\n상위 {review_num}개의 반론/질문에 대한 순위를 도출해주세요."
     
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
-            {"role": "system", "content": "You are a critical thinking expert who can evaluate arguments and questions in Korean."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
         ],
-        response_format={"type": "json_object"},
-        temperature=0.3,  # Lower temperature for more consistent ranking
-        max_completion_tokens=4096,
-        top_p=1
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "ranked_reviews_schema",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "ranked_reviews": {
+                            "type": "array",
+                            "description": "An array of ranked reviews, each represented as a number.",
+                            "items": {
+                                "type": "number",
+                                "description": "A single ranked review score."
+                            }
+                        }
+                    },
+                    "required": [
+                        "ranked_reviews"
+                    ],
+                    "additionalProperties": False
+                }
+            }
+        },
+        temperature=0,
+        max_completion_tokens=2048,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
     )
     
     try:
-        ranked_reviews = json.loads(response.choices[0].message.content)
-        # Ensure we have the expected format - should be a list of review objects
-        if isinstance(ranked_reviews, list) and len(ranked_reviews) <= review_num:
-            return ranked_reviews
-        # If we get a different format (e.g., {"ranked_reviews": [...]}), try to extract the list
-        elif isinstance(ranked_reviews, dict) and any(isinstance(ranked_reviews.get(k), list) for k in ranked_reviews):
-            for k, v in ranked_reviews.items():
-                if isinstance(v, list) and len(v) <= review_num:
-                    return v
+        parsed_response = json.loads(response.choices[0].message.content)
+        ranked_indices = parsed_response.get("ranked_reviews", [])
         
-        # Fallback to original reviews if format is unexpected
-        return reviews[:review_num]
+        if not ranked_indices or len(ranked_indices) == 0:
+            print("Warning: No ranked indices returned, falling back to first reviews")
+            return reviews[:review_num]
+        
+        # Get the top ranked reviews based on the indices
+        # Ensure indices are valid (within range and integer)
+        valid_indices = [int(idx) for idx in ranked_indices if 0 <= int(idx) < len(reviews)][:review_num]
+        if not valid_indices:
+            return reviews[:review_num]
+        
+        # Get the selected reviews
+        selected_reviews = [reviews[idx] for idx in valid_indices if idx < len(reviews)]
+        
+        # If we have fewer selected reviews than requested, add from the beginning of the list
+        if len(selected_reviews) < review_num:
+            remaining_indices = [i for i in range(len(reviews)) if i not in valid_indices]
+            for i in remaining_indices:
+                if len(selected_reviews) >= review_num:
+                    break
+                selected_reviews.append(reviews[i])
+        
+        return selected_reviews
+        
     except Exception as e:
         print(f"Error parsing ranked reviews: {e}")
         return reviews[:review_num]
@@ -426,13 +466,14 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
 @app.post("/review", response_model=ReviewResponse)
 async def review(request: ReviewRequest):
     try:
-        global previous_tree
+        global previous_tree, unselected_reviews
         tree = request.tree
         review_num = request.review_num
         
         # Get current tree state as dictionary
         current_tree_dict = get_all_nodes(tree)
         print("previous_tree:", previous_tree)
+        
         # Determine which nodes to review
         if previous_tree:
             # Get previous tree state
@@ -455,10 +496,12 @@ async def review(request: ReviewRequest):
             #if not new_nodes:
             #    new_nodes = [tree] + tree.child
         print("new_nodes:", new_nodes)
+        
         # Generate reviews for new nodes in parallel
         review_tasks = [generate_review(node, tree) for node in new_nodes]
         reviews = await asyncio.gather(*review_tasks)
         print("reviews:", reviews)
+        
         # Flatten the list of reviews if any are lists themselves
         flattened_reviews = []
         for review in reviews:
@@ -466,16 +509,46 @@ async def review(request: ReviewRequest):
                 flattened_reviews.extend(review)
             else:
                 flattened_reviews.append(review)
-        print("flattened_reviews:", flattened_reviews)
+        
+        # Combine newly generated reviews with previously unselected reviews
+        combined_reviews = flattened_reviews + unselected_reviews
+        print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
+        
         # Rank the reviews and get the top ones
-        ranked_reviews = await rank_reviews(flattened_reviews, tree, review_num)
+        ranked_reviews = await rank_reviews(combined_reviews, tree, review_num)
         print("ranked_reviews:", ranked_reviews)
+        
+        # Store unselected reviews for future use
+        if len(combined_reviews) > len(ranked_reviews):
+            # Find reviews that weren't selected
+            unselected_reviews = []
+            selected_ids = {review.get("parent", "") for review in ranked_reviews}
+            
+            for review in combined_reviews:
+                review_id = review.get("parent", "")
+                review_content = review.get("tree", {}).get("content", "")
+                
+                # Check if this review isn't in the selected list
+                # or if it's a different review for the same parent node
+                is_duplicate = False
+                for selected_review in ranked_reviews:
+                    if (selected_review.get("parent", "") == review_id and 
+                        selected_review.get("tree", {}).get("content", "") == review_content):
+                        is_duplicate = True
+                        break
+                
+                if not is_duplicate and review not in ranked_reviews:
+                    unselected_reviews.append(review)
+            
+            print(f"Stored {len(unselected_reviews)} unselected reviews for future use")
+        
         # Store the current tree for future comparison
         previous_tree = deepcopy(tree)
         
         # Return the ranked reviews
         return {"data": ranked_reviews}
     except Exception as e:
+        print(f"Error in review endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
 
 if __name__ == "__main__":
