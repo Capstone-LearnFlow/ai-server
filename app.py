@@ -287,10 +287,6 @@ async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
                 "schema": {
                     "type": "object",
                     "properties": {
-                        "parent": {
-                            "type": "string",
-                            "description": "The identifier of the parent node."
-                        },
                         "tree": {
                             "type": "object",
                             "anyOf": [
@@ -361,7 +357,7 @@ async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
                             ]
                         }
                     },
-                    "required": ["parent", "tree"],
+                    "required": ["tree"],
                     "additionalProperties": False
                 }
             }
@@ -374,7 +370,11 @@ async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
         store=True
     )
     
-    return json.loads(response.choices[0].message.content)
+    # Parse the response and add the node's ID as the parent field
+    review_data = json.loads(response.choices[0].message.content)
+    review_data["parent"] = node.id
+    
+    return review_data
 
 async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
     """Rank the generated reviews and return the top ones."""
