@@ -57,30 +57,6 @@ def example_review():
         "created_at": "2025-05-12T09:00:00Z",
         "updated_at": "2025-05-12T09:00:00Z"
     }
-    
-    # 첫 번째 요청 - 기본 1개 리뷰
-    # First request - default 1 review
-    print("\n==== 첫 번째 요청: 초기 트리, 기본 1개 리뷰 ====")
-    payload1 = {
-        "tree": initial_tree
-    }
-    response1 = requests.post(url, json=payload1)
-    result1 = response1.json()
-    print(json.dumps(result1, ensure_ascii=False, indent=2))
-    
-    # 두 번째 요청 - 동일한 트리, 3개 리뷰 요청
-    # Second request - same tree, requesting 3 reviews
-    print("\n==== 두 번째 요청: 동일한 트리, 3개 리뷰 요청 ====")
-    payload2 = {
-        "tree": initial_tree,
-        "review_num": 3
-    }
-    response2 = requests.post(url, json=payload2)
-    result2 = response2.json()
-    print(json.dumps(result2, ensure_ascii=False, indent=2))
-    
-    # 트리에 새로운 근거 노드 추가
-    # Add new evidence node to the tree
     tree_with_evidence = json.loads(json.dumps(initial_tree))  # Deep copy
     tree_with_evidence["child"][0]["child"] = [
         {
@@ -95,95 +71,58 @@ def example_review():
             "updated_at": "2025-05-12T11:30:00Z"
         }
     ]
+    tree_with_evidence["child"][0]["child"].append(
+        {
+            "id": "evidence2",
+            "type": "근거",
+            "child": [],
+            "sibling": [],
+            "content": "정년 연장은 고령화로 인한 노동력 부족 문제를 완화하는 데 효과적입니다. 2026년에는 65세 이상 인구가 전체의 20%를 넘을 것으로 예상되며, 정년 연장은 숙련된 인력을 계속 활용할 수 있는 방안으로 주목받고 있습니다",
+            "summary": "노동력 부족 문제 완화",
+            "created_by": "user1",
+            "created_at": "2025-05-12T11:30:00Z",
+            "updated_at": "2025-05-12T11:30:00Z"
+        }
+    )
+    # 첫 번째 요청 - 기본 1개 리뷰
+    # First request - default 1 review
+    print("\n==== 첫 번째 요청: 초기 트리, 기본 1개 리뷰 ====")
+    payload1 = {
+        "tree": tree_with_evidence
+    }
+    response1 = requests.post(url, json=payload1)
+    result1 = response1.json()
+    print(json.dumps(result1, ensure_ascii=False, indent=2))
+    
+    # 트리에 새로운 근거 노드 추가
+    # Add new evidence node to the tree
+    tree_with_evidence = json.loads(json.dumps(tree_with_evidence))  # Deep copy
+    tree_with_evidence["child"][0]["child"].append(
+        {
+            "id": "evidence3",
+            "type": "근거",
+            "child": [],
+            "sibling": [],
+            "content": "고령 근로자가 더 오래 일할 수 있도록 정년을 연장하면, 국민연금 수급 전까지의 소득 공백을 줄여 노인 빈곤 문제 해결에 도움이 됩니다. 이는 노후 소득 보장과 경제적 안정성 확보에 중요한 역할을 합니다",
+            "summary": "노인 빈곤 문제 해결",
+            "created_by": "user1",
+            "created_at": "2025-05-12T11:30:00Z",
+            "updated_at": "2025-05-12T11:30:00Z"
+        }
+    )
     
     # 세 번째 요청 - 근거가 추가된 트리, 2개 리뷰 요청
     # Third request - tree with added evidence, requesting 2 reviews
-    print("\n==== 세 번째 요청: 근거가 추가된 트리, 2개 리뷰 요청 ====")
+    print("\n==== 세 번째 요청: 근거가 추가된 트리, 1개 리뷰 요청 ====")
     payload3 = {
         "tree": tree_with_evidence,
-        "review_num": 2
+        "review_num": 1
     }
     response3 = requests.post(url, json=payload3)
     result3 = response3.json()
     print(json.dumps(result3, ensure_ascii=False, indent=2))
     
-    # 트리에 새로운 반론 노드와 그에 대한 근거 추가
-    # Add a counterargument and its evidence to the tree
-    tree_with_counterargument = json.loads(json.dumps(tree_with_evidence))  # Deep copy
-    tree_with_counterargument["child"][0]["child"].append({
-        "id": "counter1",
-        "type": "반론",
-        "child": [
-            {
-                "id": "counter_evidence1",
-                "type": "근거",
-                "child": [],
-                "sibling": [],
-                "content": "정년 연장은 청년 일자리를 감소시키는 결과를 초래할 수 있다. 일본의 사례에서 보듯이 정년 연장 후 청년 실업률이 증가하는 경향이 나타났다.",
-                "summary": "청년 일자리 감소 우려",
-                "created_by": "user2",
-                "created_at": "2025-05-12T13:00:00Z",
-                "updated_at": "2025-05-12T13:00:00Z"
-            }
-        ],
-        "sibling": [],
-        "content": "정년 연장은 세대 간 일자리 갈등을 심화시킬 수 있으며, 조직의 신진대사를 저해할 우려가 있다.",
-        "summary": "정년 연장의 부작용",
-        "created_by": "user2",
-        "created_at": "2025-05-12T12:45:00Z",
-        "updated_at": "2025-05-12T12:45:00Z"
-    })
     
-    # 네 번째 요청 - 반론이 추가된 트리, 2개 리뷰 요청
-    # Fourth request - tree with added counterargument, requesting 2 reviews
-    print("\n==== 네 번째 요청: 반론이 추가된 트리, 2개 리뷰 요청 ====")
-    payload4 = {
-        "tree": tree_with_counterargument,
-        "review_num": 2
-    }
-    response4 = requests.post(url, json=payload4)
-    result4 = response4.json()
-    print(json.dumps(result4, ensure_ascii=False, indent=2))
-    
-    # 반론 노드에 대한 반론 추가 (반론의 반론)
-    # Add a counterargument to the counterargument
-    tree_with_nested_argument = json.loads(json.dumps(tree_with_counterargument))  # Deep copy
-    counter_node = next((node for node in tree_with_nested_argument["child"][0]["child"] if node["id"] == "counter1"), None)
-    if counter_node:
-        counter_node["child"].append({
-            "id": "counter_to_counter1",
-            "type": "반론",
-            "child": [
-                {
-                    "id": "counter_to_counter_evidence1",
-                    "type": "근거",
-                    "child": [],
-                    "sibling": [],
-                    "content": "정년 연장과 청년 일자리는 상충관계가 아닌 보완관계가 될 수 있다. 고령자의 경험과 청년의 새로운 아이디어가 결합하면 기업 경쟁력이 향상된다는 연구 결과가 있다.",
-                    "summary": "세대 간 상생 가능성",
-                    "created_by": "user1",
-                    "created_at": "2025-05-12T14:30:00Z",
-                    "updated_at": "2025-05-12T14:30:00Z"
-                }
-            ],
-            "sibling": [],
-            "content": "정년 연장과 청년 고용은 상충관계가 아니며, 세대 간 지식 전수와 멘토링을 통해 생산성을 높일 수 있다.",
-            "summary": "세대 간 상생 가능성",
-            "created_by": "user1",
-            "created_at": "2025-05-12T14:15:00Z",
-            "updated_at": "2025-05-12T14:15:00Z"
-        })
-    
-    # 다섯 번째 요청 - 복잡한 중첩 논증 구조, 2개 리뷰 요청
-    # Fifth request - complex nested argumentation structure, requesting 2 reviews
-    print("\n==== 다섯 번째 요청: 복잡한 중첩 논증 구조, 2개 리뷰 요청 ====")
-    payload5 = {
-        "tree": tree_with_nested_argument,
-        "review_num": 2
-    }
-    response5 = requests.post(url, json=payload5)
-    result5 = response5.json()
-    print(json.dumps(result5, ensure_ascii=False, indent=2))
     
 if __name__ == "__main__":
     #example_chat()
