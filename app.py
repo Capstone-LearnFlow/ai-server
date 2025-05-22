@@ -130,6 +130,59 @@ def find_node_by_id(tree: TreeNode, node_id: str) -> Optional[TreeNode]:
     
     return None
 
+def extract_subtree_to_root(node: TreeNode, tree: TreeNode) -> TreeNode:
+    """Extract a subtree that includes the path from the given node to the root.
+    
+    Args:
+        node: The node to start from
+        tree: The complete tree structure
+        
+    Returns:
+        A new tree containing only the path from the node to the root
+    """
+    # Create a parent map for the entire tree
+    parent_map = get_parent_map(tree)
+    
+    # Build a path from the node to the root
+    path_nodes = [node]
+    current_id = node.id
+    
+    while current_id in parent_map and parent_map[current_id]:
+        parent_node = parent_map[current_id]
+        path_nodes.append(parent_node)
+        current_id = parent_node.id
+    
+    # Create a new subtree with only the nodes in the path
+    # Start from the root (last node in the path)
+    if not path_nodes:
+        return deepcopy(node)  # Fallback to just the node if path is empty
+    
+    path_nodes.reverse()  # Reverse so root is first
+    
+    # Create a copy of the root node
+    subtree = deepcopy(path_nodes[0])
+    subtree.child = []  # Clear children
+    subtree.sibling = []  # Clear siblings
+    
+    # Build the path down to the target node
+    current_node = subtree
+    for i in range(1, len(path_nodes)):
+        child_copy = deepcopy(path_nodes[i])
+        child_copy.child = []  # Clear children that aren't in the path
+        child_copy.sibling = []  # Clear siblings
+        
+        current_node.child = [child_copy]  # Add as the only child
+        current_node = child_copy  # Move down to the child for next iteration
+    
+    # If the last node in the path is not the original node, add it
+    if path_nodes[-1].id != node.id:
+        node_copy = deepcopy(node)
+        node_copy.child = []
+        node_copy.sibling = []
+        current_node.child = [node_copy]
+    
+    return subtree
+
 def get_all_nodes(tree: TreeNode) -> Dict[str, TreeNode]:
     """Get all nodes in the tree as a dictionary with node IDs as keys."""
     result = {tree.id: tree}
@@ -144,34 +197,82 @@ def get_all_nodes(tree: TreeNode) -> Dict[str, TreeNode]:
     
     return result
 
+def get_parent_map(tree: TreeNode) -> Dict[str, TreeNode]:
+    """Build a dictionary mapping node IDs to their parent nodes."""
+    parent_map = {}
+    
+    def process_children(parent_node, children):
+        for child in children:
+            parent_map[child.id] = parent_node
+            # Process this child's children
+            process_children(child, child.child)
+            # Process this child's siblings
+            process_children(parent_node, child.sibling)
+    
+    # Process root node's children
+    process_children(tree, tree.child)
+    
+    # Process root node's siblings
+    for sibling in tree.sibling:
+        parent_map[sibling.id] = None  # Root-level siblings don't have a parent in our context
+        process_children(sibling, sibling.child)
+    
+    return parent_map
+
 def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, TreeNode]) -> List[TreeNode]:
     """Find nodes that were added since the previous tree state."""
     new_nodes = []
     
+    # Build a dictionary of node IDs to their parent nodes
+    # We need to reconstruct the tree first
+    tree_root = None
     for node_id, node in current_tree.items():
-        # If node didn't exist before or is of type 근거 or 반론 and has been updated
-        if (node_id not in previous_tree or 
-            (node.type in ["근거", "반론"] and 
-             (node.updated_at != previous_tree[node_id].updated_at if node_id in previous_tree else True))):
-            new_nodes.append(node)
+        if tree_root is None or len(node.sibling) > 0:  # Simple heuristic to find a root node
+            tree_root = node
+            break
     
+    if tree_root is None and current_tree:  # If we couldn't find a root but have nodes
+        tree_root = next(iter(current_tree.values()))  # Just take the first node
+        
+    parent_map = get_parent_map(tree_root) if tree_root else {}
+    
+    for node_id, node in current_tree.items():
+        # Check if this is a '근거' node with a '반론' parent, which we want to exclude
+        should_exclude = False
+        if node.type == "근거" and node_id in parent_map:
+            parent_node = parent_map[node_id]
+            if parent_node and parent_node.type == "반론":
+                should_exclude = True
+                
+        # If node didn't exist before or is of type 근거 or 답변 (and not excluded) and has been updated
+        if not should_exclude and (
+            node_id not in previous_tree or 
+            (node.type in ["근거", "답변"] and 
+             (node.updated_at != previous_tree[node_id].updated_at if node_id in previous_tree else True))
+        ):
+            new_nodes.append(node)
+
     return new_nodes
 
 async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     """Generate a review (counterargument or question) for a given node."""
-    tree_json = tree.model_dump()
-    tree_str = json.dumps(tree_json, ensure_ascii=False, indent=2)
+    # Extract the subtree from the node to the root
+    subtree = extract_subtree_to_root(node, tree)
+    subtree_json = subtree.model_dump()
+    subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
     
     prompt = (
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
-        "아래 트리 전체를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
+        "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
+        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
         "IMPORTANT: 반론에는 반드시 child에 type이 근거인 노드가 포함되어야 하며, 질문은 명확하고 구체적이어야 합니다.\n"
         "응답은 반드시 JSON 스키마에 맞춰주세요.\n"
-        f"[트리 구조]:\n{tree_str}\n"
+        f"[트리 구조]:\n{subtree_str}\n"
         f"[검토 대상 nodeId]: {node.id}"
     )
-    
+    print("Prompt for review generation:", prompt)
+
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
@@ -331,7 +432,7 @@ async def review(request: ReviewRequest):
         
         # Get current tree state as dictionary
         current_tree_dict = get_all_nodes(tree)
-        
+        print("previous_tree:", previous_tree)
         # Determine which nodes to review
         if previous_tree:
             # Get previous tree state
@@ -344,13 +445,20 @@ async def review(request: ReviewRequest):
                 # If no new nodes, review root level nodes as fallback
                 new_nodes = [tree] + tree.child
         else:
-            # First time seeing any tree, review the main nodes
-            new_nodes = [tree] + tree.child
-        
+            # First time seeing any tree, filter for nodes of type '근거' or '답변'
+            new_nodes = []
+            for node_id, node in current_tree_dict.items():
+                if node.type in ["근거", "답변"]:
+                    new_nodes.append(node)
+            
+            # If no 근거 or 답변 nodes are found, fall back to main nodes
+            #if not new_nodes:
+            #    new_nodes = [tree] + tree.child
+        print("new_nodes:", new_nodes)
         # Generate reviews for new nodes in parallel
         review_tasks = [generate_review(node, tree) for node in new_nodes]
         reviews = await asyncio.gather(*review_tasks)
-        
+        print("reviews:", reviews)
         # Flatten the list of reviews if any are lists themselves
         flattened_reviews = []
         for review in reviews:
@@ -358,10 +466,10 @@ async def review(request: ReviewRequest):
                 flattened_reviews.extend(review)
             else:
                 flattened_reviews.append(review)
-        
+        print("flattened_reviews:", flattened_reviews)
         # Rank the reviews and get the top ones
         ranked_reviews = await rank_reviews(flattened_reviews, tree, review_num)
-        
+        print("ranked_reviews:", ranked_reviews)
         # Store the current tree for future comparison
         previous_tree = deepcopy(tree)
         
