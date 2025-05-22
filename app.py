@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Literal, Optional, Union
-from openai import OpenAI
+from openai import AsyncOpenAI
 import os
 from dotenv import load_dotenv
 import json
@@ -12,8 +12,8 @@ from copy import deepcopy
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize AsyncOpenAI client
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI(title="OpenAI API Integration Server")
 
@@ -77,7 +77,7 @@ class ReviewResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[message.model_dump() for message in request.messages]
         )
@@ -88,16 +88,12 @@ async def chat(request: ChatRequest):
 @app.post("/summary", response_model=SummaryResponse)
 async def summary(request: SummaryRequest):
     async def get_summary(content):
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[
-                    {"role": "system", "content": "Summarize the following content into a very concise single sentence in Korean."},
-                    {"role": "user", "content": content}
-                ]
-            )
+        response = await client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "Summarize the following content into a very concise single sentence in Korean."},
+                {"role": "user", "content": content}
+            ]
         )
         return response.choices[0].message.content
 
@@ -274,7 +270,8 @@ async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     )
     print("Prompt for review generation:", prompt)
 
-    response = client.chat.completions.create(
+    # Use AsyncOpenAI client's built-in async methods
+    response = await client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions in Korean."},
@@ -395,7 +392,8 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
     
     user_content = f"[트리 구조]:\n{tree_str}\n\n[반론/질문 목록]:\n{reviews_str}\n\n상위 {review_num}개의 반론/질문에 대한 순위를 도출해주세요."
     
-    response = client.chat.completions.create(
+    # Use AsyncOpenAI client's built-in async methods
+    response = await client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": system_content},
