@@ -74,6 +74,11 @@ class ReviewResponseData(BaseModel):
 class ReviewResponse(BaseModel):
     data: List[ReviewResponseData]
 
+# Models for /reset endpoint
+class ResetResponse(BaseModel):
+    message: str
+    status: str
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
@@ -548,6 +553,26 @@ async def review(request: ReviewRequest):
     except Exception as e:
         print(f"Error in review endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
+
+@app.post("/reset", response_model=ResetResponse)
+async def reset():
+    """Reset the server state by clearing previous tree and unselected reviews."""
+    try:
+        global previous_tree, unselected_reviews
+        
+        # Clear all stored state
+        previous_tree = None
+        unselected_reviews = []
+        
+        print("Server state has been reset successfully")
+        
+        return {
+            "message": "Server state has been reset successfully",
+            "status": "success"
+        }
+    except Exception as e:
+        print(f"Error resetting server state: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error resetting server state: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
