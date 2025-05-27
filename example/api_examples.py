@@ -125,6 +125,6 @@ def example_review():
     
     
 if __name__ == "__main__":
-    #example_chat()
-    #example_summary()
+    example_chat()
+    example_summary()
     example_review()
