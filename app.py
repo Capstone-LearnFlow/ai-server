@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, ValidationError
 from typing import List, Dict, Any, Literal, Optional, Union
 from openai import AsyncOpenAI
 import os
@@ -7,6 +9,7 @@ from dotenv import load_dotenv
 import json
 import asyncio
 import uvicorn
+import traceback
 from copy import deepcopy
 
 # Load environment variables
@@ -16,6 +19,38 @@ load_dotenv()
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI(title="OpenAI API Integration Server")
+
+# Exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    print("=== 422 Validation Error Details ===")
+    print(f"Request URL: {request.url}")
+    print(f"Request Method: {request.method}")
+    
+    # Print detailed error information
+    for i, error in enumerate(exc.errors()):
+        print(f"Error {i + 1}:")
+        print(f"  Location: {error['loc']}")
+        print(f"  Message: {error['msg']}")
+        print(f"  Type: {error['type']}")
+        if 'input' in error:
+            print(f"  Input: {error['input']}")
+        if 'ctx' in error:
+            print(f"  Context: {error['ctx']}")
+        print()
+    
+    print("Raw request body:")
+    try:
+        body = await request.body()
+        print(body.decode('utf-8'))
+    except Exception as e:
+        print(f"Could not read request body: {e}")
+    print("=== End of Validation Error Details ===")
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
 
 # Models for /chat endpoint
 class MessageContent(BaseModel):
@@ -469,6 +504,14 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
 @app.post("/review", response_model=ReviewResponse)
 async def review(request: ReviewRequest):
     try:
+        print("=== /review endpoint called ===")
+        print(f"Request data validation successful")
+        print(f"Tree root ID: {request.tree.id}")
+        print(f"Tree root type: {request.tree.type}")
+        print(f"Review num: {request.review_num}")
+        print(f"Number of child nodes: {len(request.tree.child)}")
+        print(f"Number of sibling nodes: {len(request.tree.sibling)}")
+        
         global previous_tree, unselected_reviews
         tree = request.tree
         review_num = request.review_num
@@ -550,8 +593,17 @@ async def review(request: ReviewRequest):
         
         # Return the ranked reviews
         return {"data": ranked_reviews}
+    except ValidationError as ve:
+        print("=== Validation Error in /review endpoint ===")
+        print(f"Validation Error: {ve}")
+        print(f"Error details: {ve.errors()}")
+        raise HTTPException(status_code=422, detail=f"Validation error: {ve.errors()}")
     except Exception as e:
-        print(f"Error in review endpoint: {str(e)}")
+        print(f"=== General Error in /review endpoint ===")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
 
 @app.post("/reset", response_model=ResetResponse)
