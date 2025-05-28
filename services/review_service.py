@@ -1,5 +1,7 @@
 import asyncio
-from typing import List, Dict, Any
+import os
+import json
+from typing import List, Dict, Any, Optional, Tuple
 from copy import deepcopy
 from models import TreeNode
 from services.tree_utils import get_all_nodes, find_new_nodes
@@ -8,13 +10,103 @@ from services.openai_service import generate_review, rank_reviews
 
 class ReviewService:
     def __init__(self):
-        self.previous_tree = None
-        self.unselected_reviews = []
+        # In-memory cache of previous_tree and unselected_reviews per student and assignment
+        self.state_cache = {}
+        
+        # Ensure data directory exists
+        self.data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        os.makedirs(self.data_dir, exist_ok=True)
     
-    def reset_state(self):
-        """Reset the service state by clearing previous tree and unselected reviews."""
-        self.previous_tree = None
-        self.unselected_reviews = []
+    def _get_file_path(self, student_id: str, assignment_id: str) -> str:
+        """Get the file path for a student's assignment data."""
+        return os.path.join(self.data_dir, f"{student_id}_{assignment_id}.json")
+    
+    def _get_state(self, student_id: str, assignment_id: str) -> Tuple[Optional[TreeNode], List[Dict[str, Any]]]:
+        """Get the state for a student's assignment, either from cache or from file."""
+        cache_key = f"{student_id}_{assignment_id}"
+        
+        # Check if state is in cache
+        if cache_key in self.state_cache:
+            return self.state_cache[cache_key]["previous_tree"], self.state_cache[cache_key]["unselected_reviews"]
+        
+        # Try to load from file
+        file_path = self._get_file_path(student_id, assignment_id)
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                previous_tree = None
+                if data.get("previous_tree"):
+                    previous_tree = TreeNode.parse_obj(data["previous_tree"])
+                
+                unselected_reviews = data.get("unselected_reviews", [])
+                
+                # Update cache
+                self.state_cache[cache_key] = {
+                    "previous_tree": previous_tree,
+                    "unselected_reviews": unselected_reviews
+                }
+                
+                return previous_tree, unselected_reviews
+            except Exception as e:
+                print(f"Error loading state from file: {e}")
+        
+        # Return default empty state if no data found
+        return None, []
+    
+    def _save_state(self, student_id: str, assignment_id: str, previous_tree: Optional[TreeNode], unselected_reviews: List[Dict[str, Any]]):
+        """Save the state for a student's assignment to both cache and file."""
+        cache_key = f"{student_id}_{assignment_id}"
+        
+        # Update cache
+        self.state_cache[cache_key] = {
+            "previous_tree": previous_tree,
+            "unselected_reviews": unselected_reviews
+        }
+        
+        # Save to file
+        file_path = self._get_file_path(student_id, assignment_id)
+        try:
+            data = {
+                "previous_tree": previous_tree.dict() if previous_tree else None,
+                "unselected_reviews": unselected_reviews
+            }
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error saving state to file: {e}")
+    
+    def reset_state(self, student_id: str, assignment_id: str):
+        """Reset the service state for a specific student and assignment."""
+        cache_key = f"{student_id}_{assignment_id}"
+        
+        # Clear from cache
+        if cache_key in self.state_cache:
+            del self.state_cache[cache_key]
+        
+        # Remove file if it exists
+        file_path = self._get_file_path(student_id, assignment_id)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing state file: {e}")
+    
+    def reset_all(self):
+        """Reset all stored states."""
+        # Clear cache
+        self.state_cache = {}
+        
+        # Remove all data files
+        if os.path.exists(self.data_dir):
+            for filename in os.listdir(self.data_dir):
+                if filename.endswith(".json"):
+                    try:
+                        os.remove(os.path.join(self.data_dir, filename))
+                    except Exception as e:
+                        print(f"Error removing state file {filename}: {e}")
     
     async def process_review_request(self, tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
         """Process a review request and return ranked reviews."""
@@ -24,13 +116,22 @@ class ReviewService:
         print(f"Review num: {review_num}")
         print(f"Number of child nodes: {len(tree.child)}")
         print(f"Number of sibling nodes: {len(tree.sibling)}")
+        print(f"Student ID: {tree.student_id}")
+        print(f"Assignment ID: {tree.assignment_id}")
+        
+        # Get student_id and assignment_id from tree (assuming they are passed here)
+        student_id = tree.student_id
+        assignment_id = tree.assignment_id
+        
+        # Get current state for this student and assignment
+        previous_tree, unselected_reviews = self._get_state(student_id, assignment_id)
         
         # Get current tree state as dictionary
         current_tree_dict = get_all_nodes(tree)
-        print("Previous tree exists:", self.previous_tree is not None)
+        print("Previous tree exists:", previous_tree is not None)
         
         # Determine which nodes to review
-        new_nodes = self._determine_nodes_to_review(current_tree_dict, tree)
+        new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
         print(f"New nodes to review: {len(new_nodes)}")
         
         # Generate reviews for new nodes in parallel
@@ -38,7 +139,7 @@ class ReviewService:
         print(f"Generated reviews: {len(reviews)}")
         
         # Combine newly generated reviews with previously unselected reviews
-        combined_reviews = reviews + self.unselected_reviews
+        combined_reviews = reviews + unselected_reviews
         print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
         
         # Rank the reviews and get the top ones
@@ -46,18 +147,18 @@ class ReviewService:
         print(f"Ranked reviews: {len(ranked_reviews)}")
         
         # Update unselected reviews for future use
-        self._update_unselected_reviews(combined_reviews, ranked_reviews)
+        new_unselected_reviews = self._calculate_unselected_reviews(combined_reviews, ranked_reviews)
         
-        # Store the current tree for future comparison
-        self.previous_tree = deepcopy(tree)
+        # Store the current tree and unselected reviews for future comparison
+        self._save_state(student_id, assignment_id, deepcopy(tree), new_unselected_reviews)
         
         return ranked_reviews
     
-    def _determine_nodes_to_review(self, current_tree_dict: Dict[str, TreeNode], tree: TreeNode) -> List[TreeNode]:
+    def _determine_nodes_to_review(self, current_tree_dict: Dict[str, TreeNode], tree: TreeNode, previous_tree: Optional[TreeNode]) -> List[TreeNode]:
         """Determine which nodes need to be reviewed."""
-        if self.previous_tree:
+        if previous_tree:
             # Get previous tree state
-            previous_tree_dict = get_all_nodes(self.previous_tree)
+            previous_tree_dict = get_all_nodes(previous_tree)
             
             # Find new nodes
             new_nodes = find_new_nodes(current_tree_dict, previous_tree_dict)
@@ -89,12 +190,11 @@ class ReviewService:
         
         return flattened_reviews
     
-    def _update_unselected_reviews(self, combined_reviews: List[Dict[str, Any]], ranked_reviews: List[Dict[str, Any]]):
-        """Update the list of unselected reviews for future use."""
+    def _calculate_unselected_reviews(self, combined_reviews: List[Dict[str, Any]], ranked_reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Calculate the list of unselected reviews for future use."""
+        unselected = []
+        
         if len(combined_reviews) > len(ranked_reviews):
-            # Find reviews that weren't selected
-            self.unselected_reviews = []
-            
             for review in combined_reviews:
                 review_id = review.get("parent", "")
                 review_content = review.get("tree", {}).get("content", "")
@@ -109,6 +209,8 @@ class ReviewService:
                         break
                 
                 if not is_duplicate and review not in ranked_reviews:
-                    self.unselected_reviews.append(review)
+                    unselected.append(review)
             
-            print(f"Stored {len(self.unselected_reviews)} unselected reviews for future use")
+            print(f"Stored {len(unselected)} unselected reviews for future use")
+        
+        return unselected
