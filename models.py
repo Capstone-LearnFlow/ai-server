@@ -47,6 +47,8 @@ class TreeNode(BaseModel):
 class ReviewRequest(BaseModel):
     tree: TreeNode
     review_num: int = 1  # Default to 1 if not provided
+    student_id: str  # Student identifier
+    assignment_id: str  # Assignment identifier
 
 
 class EvidenceNode(BaseModel):
@@ -73,5 +75,11 @@ class ReviewResponse(BaseModel):
 
 # Models for /reset endpoint
 class ResetResponse(BaseModel):
+    message: str
+    status: str
+
+
+# Models for /resetall endpoint
+class ResetAllResponse(BaseModel):
     message: str
     status: str
