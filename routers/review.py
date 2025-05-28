@@ -14,13 +14,11 @@ review_service = ReviewService()
 async def review(request: ReviewRequest):
     """Generate reviews (counterarguments or questions) for a tree structure."""
     try:
-        # Add student_id and assignment_id to the tree for tracking purposes
-        setattr(request.tree, "student_id", request.student_id)
-        setattr(request.tree, "assignment_id", request.assignment_id)
-        
         ranked_reviews = await review_service.process_review_request(
             request.tree, 
-            request.review_num
+            request.review_num,
+            request.student_id,
+            request.assignment_id
         )
         return {"data": ranked_reviews}
     except ValidationError as ve:
