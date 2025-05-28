@@ -32,6 +32,11 @@ def example_summary():
 def example_review():
     url = f"{BASE_URL}/review"
     
+    # 학생 ID와 과제 ID 설정
+    # Set student ID and assignment ID
+    student_id = "student001"
+    assignment_id = "assignment001"
+    
     # 초기 논증 트리 생성 - 주제와 주요 주장
     # Initial argument tree - topic and main argument
     initial_tree = {
@@ -88,7 +93,9 @@ def example_review():
     # First request - default 1 review
     print("\n==== 첫 번째 요청: 초기 트리, 기본 1개 리뷰 ====")
     payload1 = {
-        "tree": tree_with_evidence
+        "tree": tree_with_evidence,
+        "student_id": student_id,
+        "assignment_id": assignment_id
     }
     response1 = requests.post(url, json=payload1)
     result1 = response1.json()
@@ -111,20 +118,46 @@ def example_review():
         }
     )
     
-    # 세 번째 요청 - 근거가 추가된 트리, 2개 리뷰 요청
-    # Third request - tree with added evidence, requesting 2 reviews
+    # 세 번째 요청 - 근거가 추가된 트리, 1개 리뷰 요청
+    # Third request - tree with added evidence, requesting 1 review
     print("\n==== 세 번째 요청: 근거가 추가된 트리, 1개 리뷰 요청 ====")
     payload3 = {
         "tree": tree_with_evidence,
-        "review_num": 1
+        "review_num": 1,
+        "student_id": student_id,
+        "assignment_id": assignment_id
     }
     response3 = requests.post(url, json=payload3)
     result3 = response3.json()
     print(json.dumps(result3, ensure_ascii=False, indent=2))
+
+
+# Example for /reset endpoint
+def example_reset():
+    student_id = "student001"
+    assignment_id = "assignment001"
+    url = f"{BASE_URL}/reset?student_id={student_id}&assignment_id={assignment_id}"
     
+    print("\n==== Reset 요청: 특정 학생과 과제의 상태 초기화 ====")
+    response = requests.post(url)
+    result = response.json()
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+# Example for /resetall endpoint
+def example_resetall():
+    url = f"{BASE_URL}/resetall"
+    
+    print("\n==== ResetAll 요청: 모든 상태 초기화 ====")
+    response = requests.post(url)
+    result = response.json()
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     
     
 if __name__ == "__main__":
     example_chat()
     example_summary()
     example_review()
+    # Uncomment below to test reset endpoints
+    # example_reset()
+    # example_resetall()
