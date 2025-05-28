@@ -108,7 +108,7 @@ class ReviewService:
                     except Exception as e:
                         print(f"Error removing state file {filename}: {e}")
     
-    async def process_review_request(self, tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
+    async def process_review_request(self, tree: TreeNode, review_num: int, student_id: str, assignment_id: str) -> List[Dict[str, Any]]:
         """Process a review request and return ranked reviews."""
         print("=== Review Service: Processing request ===")
         print(f"Tree root ID: {tree.id}")
@@ -116,12 +116,8 @@ class ReviewService:
         print(f"Review num: {review_num}")
         print(f"Number of child nodes: {len(tree.child)}")
         print(f"Number of sibling nodes: {len(tree.sibling)}")
-        print(f"Student ID: {tree.student_id}")
-        print(f"Assignment ID: {tree.assignment_id}")
-        
-        # Get student_id and assignment_id from tree (assuming they are passed here)
-        student_id = tree.student_id
-        assignment_id = tree.assignment_id
+        print(f"Student ID: {student_id}")
+        print(f"Assignment ID: {assignment_id}")
         
         # Get current state for this student and assignment
         previous_tree, unselected_reviews = self._get_state(student_id, assignment_id)
