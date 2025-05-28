@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import ValidationError
 import traceback
-from models import ReviewRequest, ReviewResponse, ResetResponse
+from models import ReviewRequest, ReviewResponse, ResetResponse, ResetAllResponse
 from services.review_service import ReviewService
 
 router = APIRouter()
@@ -14,6 +14,10 @@ review_service = ReviewService()
 async def review(request: ReviewRequest):
     """Generate reviews (counterarguments or questions) for a tree structure."""
     try:
+        # Add student_id and assignment_id to the tree for tracking purposes
+        setattr(request.tree, "student_id", request.student_id)
+        setattr(request.tree, "assignment_id", request.assignment_id)
+        
         ranked_reviews = await review_service.process_review_request(
             request.tree, 
             request.review_num
@@ -33,16 +37,35 @@ async def review(request: ReviewRequest):
 
 
 @router.post("/reset", response_model=ResetResponse)
-async def reset():
-    """Reset the server state by clearing previous tree and unselected reviews."""
+async def reset(student_id: str = Query(..., description="Student identifier"), 
+                assignment_id: str = Query(..., description="Assignment identifier")):
+    """Reset the server state for a specific student and assignment."""
     try:
-        review_service.reset_state()
-        print("Server state has been reset successfully")
+        review_service.reset_state(student_id, assignment_id)
+        message = f"Server state for student {student_id} and assignment {assignment_id} has been reset successfully"
+        print(message)
         
         return {
-            "message": "Server state has been reset successfully",
+            "message": message,
             "status": "success"
         }
     except Exception as e:
         print(f"Error resetting server state: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error resetting server state: {str(e)}")
+
+
+@router.post("/resetall", response_model=ResetAllResponse)
+async def reset_all():
+    """Reset all server states by clearing all stored data."""
+    try:
+        review_service.reset_all()
+        message = "All server states have been reset successfully"
+        print(message)
+        
+        return {
+            "message": message,
+            "status": "success"
+        }
+    except Exception as e:
+        print(f"Error resetting all server states: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error resetting all server states: {str(e)}")
