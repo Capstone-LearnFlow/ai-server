@@ -130,13 +130,16 @@ class ReviewService:
         new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
         print(f"New nodes to review: {len(new_nodes)}")
         
-        # Raise an exception if no nodes are found to review
-        if not new_nodes:
-            raise ValueError("No '근거' type nodes found to review. Please add or update nodes of type '근거'.")
-        
-        # Generate reviews for new nodes in parallel
-        reviews = await self._generate_reviews_for_nodes(new_nodes, tree)
-        print(f"Generated reviews: {len(reviews)}")
+        # Generate reviews for new nodes if available
+        reviews = []
+        if new_nodes:
+            reviews = await self._generate_reviews_for_nodes(new_nodes, tree)
+            print(f"Generated reviews: {len(reviews)}")
+        # If there are no new nodes and no unselected reviews, raise an exception
+        elif not unselected_reviews:
+            raise ValueError("No '근거' type nodes found to review and no unselected reviews available. Please add or update nodes of type '근거'.")
+        else:
+            print(f"No new nodes to review, using {len(unselected_reviews)} unselected reviews")
         
         # Combine newly generated reviews with previously unselected reviews
         combined_reviews = reviews + unselected_reviews

@@ -4,3 +4,4 @@ nohup.out
 api_docs.md
 *.cpython-310.pyc
 data/*
+example/test_results.log
