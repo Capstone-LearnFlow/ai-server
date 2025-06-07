@@ -130,6 +130,10 @@ class ReviewService:
         new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
         print(f"New nodes to review: {len(new_nodes)}")
         
+        # Raise an exception if no nodes are found to review
+        if not new_nodes:
+            raise ValueError("No '근거' type nodes found to review. Please add or update nodes of type '근거'.")
+        
         # Generate reviews for new nodes in parallel
         reviews = await self._generate_reviews_for_nodes(new_nodes, tree)
         print(f"Generated reviews: {len(reviews)}")
@@ -159,9 +163,8 @@ class ReviewService:
             # Find new nodes
             new_nodes = find_new_nodes(current_tree_dict, previous_tree_dict)
             
-            if not new_nodes:
-                # If no new nodes, review root level nodes as fallback
-                new_nodes = [tree] + tree.child
+            # No fallback - if no new nodes, return empty list
+            # An empty list will cause the review generation process to fail gracefully
         else:
             # First time seeing any tree, filter for nodes of type '근거' or '답변'
             new_nodes = []

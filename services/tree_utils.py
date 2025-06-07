@@ -119,6 +119,9 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
     """Find nodes that were added since the previous tree state."""
     new_nodes = []
     
+    # Find any new node IDs that weren't in the previous tree
+    new_node_ids = set(current_tree.keys()) - set(previous_tree.keys())
+    
     # Build a dictionary of node IDs to their parent nodes
     # We need to reconstruct the tree first
     tree_root = None
@@ -132,19 +135,40 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
         
     parent_map = get_parent_map(tree_root) if tree_root else {}
     
-    for node_id, node in current_tree.items():
-        # Check if this is a '근거' node with a '반론' parent, which we want to exclude
-        should_exclude = False
-        if node.type == "근거" and node_id in parent_map:
-            parent_node = parent_map[node_id]
-            if parent_node and parent_node.type == "반론":
-                should_exclude = True
+    # First, add all new evidence nodes that weren't in the previous tree
+    for node_id in new_node_ids:
+        node = current_tree[node_id]
+        if node.type == "근거":
+            # Check if this is a '근거' node with a '반론' parent, which we want to exclude
+            should_exclude = False
+            if node_id in parent_map:
+                parent_node = parent_map[node_id]
+                if parent_node and parent_node.type == "반론":
+                    should_exclude = True
+            
+            if not should_exclude:
+                new_nodes.append(node)
+    
+    # If no new nodes were found, check for updated nodes
+    if not new_nodes:
+        for node_id, node in current_tree.items():
+            # Skip nodes we've already processed
+            if node_id in new_node_ids:
+                continue
                 
-        # If node didn't exist before or is of type 근거 or 답변 (and not excluded) and has been updated
-        if not should_exclude and \
-            node_id not in previous_tree and \
-            (node.type in ["근거", "답변"] and \
-             (node.updated_at != previous_tree[node_id].updated_at if node_id in previous_tree else True)):
-            new_nodes.append(node)
+            # Only consider nodes of type "근거" (evidence)
+            if node.type != "근거":
+                continue
+                
+            # Check if this is a '근거' node with a '반론' parent, which we want to exclude
+            should_exclude = False
+            if node_id in parent_map:
+                parent_node = parent_map[node_id]
+                if parent_node and parent_node.type == "반론":
+                    should_exclude = True
+                    
+            # Include node if it's not excluded and has been updated
+            if not should_exclude and node_id in previous_tree and node.updated_at != previous_tree[node_id].updated_at:
+                new_nodes.append(node)
 
     return new_nodes
