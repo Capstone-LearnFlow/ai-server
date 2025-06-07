@@ -141,11 +141,10 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
                 should_exclude = True
                 
         # If node didn't exist before or is of type 근거 or 답변 (and not excluded) and has been updated
-        if not should_exclude and (
-            node_id not in previous_tree or 
-            (node.type in ["근거", "답변"] and 
-             (node.updated_at != previous_tree[node_id].updated_at if node_id in previous_tree else True))
-        ):
+        if not should_exclude and \
+            node_id not in previous_tree and \
+            (node.type in ["근거", "답변"] and \
+             (node.updated_at != previous_tree[node_id].updated_at if node_id in previous_tree else True)):
             new_nodes.append(node)
 
     return new_nodes
