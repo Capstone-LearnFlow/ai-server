@@ -1,21 +1,47 @@
 import json
 import asyncio
+import re
 from typing import List, Dict, Any
-from config import client, OPENAI_MODEL
+from config import client, cerebras_client, OPENAI_MODEL, CEREBRAS_MODEL
 from models import TreeNode
 from services.tree_utils import extract_subtree_to_root
 
 
+def clean_cerebras_response(response: str) -> str:
+    """Clean the Cerebras API response by removing <think> tags and surrounding newlines."""
+    # Remove <think>\n\n</think> and surrounding newlines
+    cleaned = re.sub(r'<think>\n\n</think>\n\n', '', response)
+    return cleaned
+
+
+async def generate_cerebras_summary(content: str) -> str:
+    """Generate a summary for a single content string using Cerebras API."""
+    response = await cerebras_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "Summarize the following content into a very concise single sentence in Korean. /nothink"
+            },
+            {
+                "role": "user",
+                "content": content
+            },
+        ],
+        model=CEREBRAS_MODEL,
+        stream=False,
+        max_tokens=16382,
+        temperature=0.6,
+        top_p=0.95
+    )
+    
+    # Extract and clean the response content
+    raw_content = response.choices[0].message.content
+    return clean_cerebras_response(raw_content)
+
+
 async def generate_summary(content: str) -> str:
     """Generate a summary for a single content string."""
-    response = await client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": "Summarize the following content into a very concise single sentence in Korean."},
-            {"role": "user", "content": content}
-        ]
-    )
-    return response.choices[0].message.content
+    return await generate_cerebras_summary(content)
 
 
 async def generate_summaries(contents: List[str]) -> List[str]:
