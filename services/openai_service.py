@@ -59,8 +59,8 @@ async def generate_chat_response(messages: List[Dict[str, Any]]) -> str:
     return response.choices[0].message.content
 
 
-async def generate_initial_review_with_persona(node: TreeNode, tree: TreeNode, persona: str) -> str:
-    """Generate an initial review with a specific persona as plain text (1-2 lines)."""
+async def generate_initial_rebuttal(node: TreeNode, tree: TreeNode, persona: str) -> str:
+    """Generate an initial rebuttal with a specific persona as plain text (1-2 lines)."""
     # Extract the subtree from the node to the root
     subtree = extract_subtree_to_root(node, tree)
     subtree_json = subtree.model_dump()
@@ -69,12 +69,8 @@ async def generate_initial_review_with_persona(node: TreeNode, tree: TreeNode, p
     persona_prompt = ""
     if persona == "teacher_rebuttal":
         persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 논리적인 반론을 제시합니다."
-    elif persona == "teacher_question":
-        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 깊이 있는 질문을 제시합니다."
     elif persona == "student_rebuttal":
         persona_prompt = "당신은 비판적 사고력을 갖춘 학생으로, 다른 학생이 이해하기 쉽게 반론을 제시합니다."
-    elif persona == "student_question":
-        persona_prompt = "당신은 호기심 많은 학생으로, 다른 학생이 이해하기 쉽게 질문을 제시합니다."
     
     prompt = (
         f"{persona_prompt}\n\n"
@@ -82,7 +78,7 @@ async def generate_initial_review_with_persona(node: TreeNode, tree: TreeNode, p
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
         "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
         "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 "
-        "반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
+        "반론(반박)을 한국어로 생성하세요. 반드시 반박 형태로 작성해야 합니다.\n"
         "응답은 반드시 1-2줄의 간결한 텍스트 형식으로 작성해주세요.\n"
         "학생이 이해하기 쉬운 언어로 작성해주세요.\n"
         f"[트리 구조]:\n{subtree_str}\n"
@@ -92,7 +88,49 @@ async def generate_initial_review_with_persona(node: TreeNode, tree: TreeNode, p
     response = await client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[
-            {"role": "system", "content": "You are a critical thinker who can generate concise counterarguments and questions in Korean based on specific personas."},
+            {"role": "system", "content": "You are a critical thinker who generates concise counterarguments in Korean. You always produce rebuttals, never questions."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+        max_completion_tokens=200,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    
+    return response.choices[0].message.content.strip()
+
+
+async def generate_initial_question(node: TreeNode, tree: TreeNode, persona: str) -> str:
+    """Generate an initial question with a specific persona as plain text (1-2 lines)."""
+    # Extract the subtree from the node to the root
+    subtree = extract_subtree_to_root(node, tree)
+    subtree_json = subtree.model_dump()
+    subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
+    
+    persona_prompt = ""
+    if persona == "teacher_question":
+        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 깊이 있는 질문을 제시합니다."
+    elif persona == "student_question":
+        persona_prompt = "당신은 호기심 많은 학생으로, 다른 학생이 이해하기 쉽게 질문을 제시합니다."
+    
+    prompt = (
+        f"{persona_prompt}\n\n"
+        "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
+        "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
+        "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
+        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 "
+        "날카로운 질문을 한국어로 생성하세요. 반드시 질문 형태로 작성해야 합니다.\n"
+        "응답은 반드시 1-2줄의 간결한 텍스트 형식으로 작성해주세요.\n"
+        "학생이 이해하기 쉬운 언어로 작성해주세요.\n"
+        f"[트리 구조]:\n{subtree_str}\n"
+        f"[검토 대상 nodeId]: {node.id}"
+    )
+    
+    response = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a critical thinker who generates insightful questions in Korean. You always produce questions, never rebuttals."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.7,
