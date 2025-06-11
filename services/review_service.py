@@ -149,6 +149,17 @@ class ReviewService:
         ranked_reviews = await rank_reviews(combined_reviews, tree, review_num)
         print(f"Ranked reviews: {len(ranked_reviews)}")
         
+        # If we have multiple ranked reviews, use Cerebras to select the best one and place it first
+        if len(ranked_reviews) > 1:
+            from services.openai_service import select_best_overall_review
+            best_review = await select_best_overall_review(ranked_reviews, tree)
+            print(f"Selected best overall review of type: {best_review.get('tree', {}).get('type', 'unknown')}")
+            
+            # Put the best review at the top of the list
+            if best_review in ranked_reviews:
+                ranked_reviews.remove(best_review)
+                ranked_reviews.insert(0, best_review)
+        
         # Update unselected reviews for future use
         new_unselected_reviews = self._calculate_unselected_reviews(combined_reviews, ranked_reviews)
         
