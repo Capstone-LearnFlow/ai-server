@@ -17,5 +17,5 @@ cerebras_client = AsyncOpenAI(base_url="https://api.cerebras.ai/v1", api_key=os.
 # Configuration constants
 OPENAI_MODEL = "gpt-4.1"
 OPENAI_MINI_MODEL = "gpt-4.1-mini"
-PERPLEXITY_MODEL = "gpt-4.1"
+PERPLEXITY_MODEL = "llama-3-70b-instruct"  # Updated to a supported Perplexity model
 CEREBRAS_MODEL = "qwen-3-32b"
