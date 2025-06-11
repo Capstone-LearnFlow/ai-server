@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from copy import deepcopy
 from models import TreeNode
 
@@ -115,6 +115,60 @@ def extract_subtree_to_root(node: TreeNode, tree: TreeNode) -> TreeNode:
     return subtree
 
 
+def count_sibling_transitions(node_id: str, parent_map: Dict[str, TreeNode], sibling_map: Dict[str, List[str]]) -> int:
+    """
+    Count the number of sibling transitions from a node to the root.
+    
+    Args:
+        node_id: The ID of the node to count from
+        parent_map: Map of node IDs to their parent nodes
+        sibling_map: Map of node IDs to their sibling node IDs
+        
+    Returns:
+        The number of sibling transitions
+    """
+    transitions = 0
+    current_id = node_id
+    
+    while current_id in parent_map and parent_map[current_id]:
+        parent_id = parent_map[current_id].id
+        
+        # Check if any siblings of the current node have the parent as a child
+        # This indicates a sibling transition
+        if parent_id in sibling_map and sibling_map[parent_id]:
+            transitions += 1
+            
+        current_id = parent_id
+        
+    return transitions
+
+def build_sibling_map(tree_root: TreeNode) -> Dict[str, List[str]]:
+    """
+    Build a dictionary mapping node IDs to their sibling node IDs.
+    
+    Args:
+        tree_root: The root node of the tree
+        
+    Returns:
+        A dictionary mapping node IDs to their sibling node IDs
+    """
+    sibling_map = {}
+    
+    def process_node(node: TreeNode):
+        # Map sibling IDs for this node
+        sibling_map[node.id] = [sibling.id for sibling in node.sibling]
+        
+        # Process child nodes
+        for child in node.child:
+            process_node(child)
+            
+        # Process sibling nodes
+        for sibling in node.sibling:
+            process_node(sibling)
+    
+    process_node(tree_root)
+    return sibling_map
+
 def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, TreeNode]) -> List[TreeNode]:
     """Find nodes that were added since the previous tree state."""
     new_nodes = []
@@ -134,6 +188,7 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
         tree_root = next(iter(current_tree.values()))  # Just take the first node
         
     parent_map = get_parent_map(tree_root) if tree_root else {}
+    sibling_map = build_sibling_map(tree_root) if tree_root else {}
     
     # First, add all new evidence nodes that weren't in the previous tree
     for node_id in new_node_ids:
@@ -143,8 +198,16 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
             should_exclude = False
             if node_id in parent_map:
                 parent_node = parent_map[node_id]
-                if parent_node and parent_node.type == "반론":
-                    should_exclude = True
+                if parent_node:
+                    # Exclude if parent is a '반론'
+                    if parent_node.type == "반론":
+                        should_exclude = True
+                    
+                    # Exclude if sibling transitions > 2
+                    # This handles cases like "주장 - 반론 - 주장" where the evidence
+                    # for the last claim shouldn't be reviewed
+                    if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 2:
+                        should_exclude = True
             
             if not should_exclude:
                 new_nodes.append(node)
@@ -164,8 +227,14 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
             should_exclude = False
             if node_id in parent_map:
                 parent_node = parent_map[node_id]
-                if parent_node and parent_node.type == "반론":
-                    should_exclude = True
+                if parent_node:
+                    # Exclude if parent is a '반론'
+                    if parent_node.type == "반론":
+                        should_exclude = True
+                    
+                    # Exclude if sibling transitions > 2
+                    if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 2:
+                        should_exclude = True
                     
             # Include node if it's not excluded and has been updated
             if not should_exclude and node_id in previous_tree and node.updated_at != previous_tree[node_id].updated_at:
