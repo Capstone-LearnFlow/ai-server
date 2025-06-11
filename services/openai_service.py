@@ -416,9 +416,8 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
             if review != best_review:
                 ordered_reviews.append(review)
         return ordered_reviews
-    """Rank the generated reviews and return the top ones."""
-    if len(reviews) <= review_num:
-        return reviews
+    
+    # For cases where we have more reviews than requested number
     
     tree_json = tree.model_dump()
     tree_str = json.dumps(tree_json, ensure_ascii=False, indent=2)
