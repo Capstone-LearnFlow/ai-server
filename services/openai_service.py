@@ -1,8 +1,8 @@
 import json
 import asyncio
 import re
-from typing import List, Dict, Any, Tuple
-from config import client, perplexity_client, cerebras_client, OPENAI_MODEL, OPENAI_MINI_MODEL, PERPLEXITY_MODEL, CEREBRAS_MODEL
+from typing import List, Dict, Any
+from config import client, perplexity_client, cerebras_client, OPENAI_MODEL, PERPLEXITY_MODEL, CEREBRAS_MODEL
 from models import TreeNode
 from services.tree_utils import extract_subtree_to_root
 
