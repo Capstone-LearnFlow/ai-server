@@ -49,6 +49,7 @@ class ReviewRequest(BaseModel):
     review_num: int = 1  # Default to 1 if not provided
     student_id: str  # Student identifier
     assignment_id: str  # Assignment identifier
+    filter_mode: int = 0  # 0: all, 1: teacher rebuttal, 2: teacher question, 3: student rebuttal, 4: student question
 
 
 class EvidenceNode(BaseModel):
