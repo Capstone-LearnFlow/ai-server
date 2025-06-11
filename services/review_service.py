@@ -189,7 +189,15 @@ class ReviewService:
         return new_nodes
     
     async def _generate_reviews_for_nodes(self, nodes: List[TreeNode], tree: TreeNode) -> List[Dict[str, Any]]:
-        """Generate reviews for the given nodes in parallel."""
+        """Generate reviews for the given nodes in parallel using the new workflow.
+        
+        Each node will go through the following steps:
+        1. Generate search query with GPT-4.1-mini
+        2. Get search results from Perplexity API
+        3. Generate reviews with different personas in parallel
+        4. Select the best review for each evidence using Cerebras API
+        """
+        print("Generating reviews with new workflow for multiple nodes")
         review_tasks = [generate_review(node, tree) for node in nodes]
         reviews = await asyncio.gather(*review_tasks)
         
@@ -201,6 +209,7 @@ class ReviewService:
             else:
                 flattened_reviews.append(review)
         
+        print(f"Generated {len(flattened_reviews)} reviews for {len(nodes)} nodes using new workflow")
         return flattened_reviews
     
     def _calculate_unselected_reviews(self, combined_reviews: List[Dict[str, Any]], ranked_reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
