@@ -375,7 +375,47 @@ async def select_best_overall_review(selected_reviews: List[Dict[str, Any]], tre
         return selected_reviews[0]
 
 
+async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
+    """Generate a review (counterargument or question) for a given node using the new workflow."""
+    print(f"Generating review for node {node.id} with new workflow")
+    
+    # Step 1: Generate search query with GPT-4.1-mini
+    query = await generate_search_query(node, tree)
+    print(f"Generated search query: {query}")
+    
+    # Step 2: Get search results from Perplexity API
+    search_results = await get_perplexity_search_results(query)
+    print(f"Got search results from Perplexity API (length: {len(search_results)})")
+    
+    # Step 3: Generate reviews with different personas in parallel
+    reviews = await generate_reviews_with_personas(node, tree, search_results)
+    print(f"Generated {len(reviews)} reviews with different personas")
+    
+    # Step 4: Select the best review for this evidence
+    selected_review = await select_best_review_for_evidence(reviews, node, tree)
+    print(f"Selected best review of type: {selected_review.get('tree', {}).get('type', 'unknown')}")
+    
+    return selected_review
+
+
 async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
+    """Rank the generated reviews and return the top ones."""
+    if len(reviews) == 0:
+        return []
+    
+    if len(reviews) == 1:
+        return reviews
+    
+    # If we have more than one review but fewer than or equal to the requested number
+    if 1 < len(reviews) <= review_num:
+        # Use select_best_overall_review to select the best review
+        best_review = await select_best_overall_review(reviews, tree)
+        # If we're supposed to return all of them anyway, put the best one first
+        ordered_reviews = [best_review]
+        for review in reviews:
+            if review != best_review:
+                ordered_reviews.append(review)
+        return ordered_reviews
     """Rank the generated reviews and return the top ones."""
     if len(reviews) <= review_num:
         return reviews
