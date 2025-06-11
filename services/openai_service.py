@@ -131,28 +131,100 @@ async def enhance_review_with_search_results(initial_review: str, search_results
     subtree_json = subtree.model_dump()
     subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
     
+    # Determine review type for JSON structure
+    review_type = "질문" if is_question else "반론"
+    
     prompt = (
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
         "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다.\n"
         f"[트리 구조]:\n{subtree_str}\n"
         f"[검토 대상 nodeId]: {node.id}\n\n"
-        f"[초기 {('질문' if is_question else '반론')}]:\n{initial_review}\n\n"
+        f"[초기 {review_type}]:\n{initial_review}\n\n"
         f"[검색 결과]:\n{search_results}\n\n"
-        f"위 정보를 바탕으로, 초기 {('질문' if is_question else '반론')}을 검색 결과를 활용하여 보강하고, "
-        f"JSON 형식으로 작성해주세요. 학생이 이해하기 쉬운 언어로 작성해주세요.\n"
+        f"위 정보를 바탕으로, 초기 {review_type}을 검색 결과를 활용하여 보강하고, "
+        f"JSON 형식으로 작성해주세요. 학생이 이해하기 쉬운 언어로 작성해주세요.\n\n"
+        f"JSON 형식은 다음과 같습니다:\n"
+        f"- 질문인 경우:\n"
+        "```json\n"
+        "{\n"
+        "  \"tree\": {\n"
+        "    \"type\": \"질문\",\n"
+        "    \"content\": \"질문 내용\",\n"
+        "    \"summary\": \"질문 요약\"\n"
+        "  }\n"
+        "}\n"
+        "```\n"
+        f"- 반론인 경우:\n"
+        "```json\n"
+        "{\n"
+        "  \"tree\": {\n"
+        "    \"type\": \"반론\",\n"
+        "    \"content\": \"반론 내용\",\n"
+        "    \"summary\": \"반론 요약\",\n"
+        "    \"child\": [\n"
+        "      {\n"
+        "        \"type\": \"근거\",\n"
+        "        \"content\": \"근거 내용\",\n"
+        "        \"summary\": \"근거 요약\"\n"
+        "      }\n"
+        "    ]\n"
+        "  }\n"
+        "}\n"
+        "```\n"
     )
+    
+    response = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a critical thinker who can enhance counterarguments and questions in Korean with search results."},
+            {"role": "user", "content": prompt}
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.7,
+        max_completion_tokens=2048,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    
+    # Parse the response and add the node's ID as the parent field
+    review_data = json.loads(response.choices[0].message.content)
+    review_data["parent"] = node.id
+    
+    return review_data
 
 
-async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode, search_results: str) -> List[Dict[str, Any]]:
+async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode) -> List[Dict[str, Any]]:
     """Generate reviews with different personas in parallel."""
     personas = ["teacher_rebuttal", "teacher_question", "student_rebuttal", "student_question"]
     
-    # Generate reviews with different personas in parallel
-    tasks = [generate_review_with_persona(node, tree, search_results, persona) for persona in personas]
-    reviews = await asyncio.gather(*tasks)
+    # Generate initial reviews with different personas in parallel
+    initial_review_tasks = [generate_initial_review_with_persona(node, tree, persona) for persona in personas]
+    initial_reviews = await asyncio.gather(*initial_review_tasks)
     
-    return reviews
+    # Use each initial review as a search query and get search results
+    search_tasks = [get_perplexity_search_results(review) for review in initial_reviews]
+    search_results = await asyncio.gather(*search_tasks)
+    
+    # Enhance each review with its search results
+    is_question_values = [persona.endswith('question') for persona in personas]
+    enhanced_review_tasks = [
+        enhance_review_with_search_results(
+            initial_reviews[i], 
+            search_results[i], 
+            node, 
+            tree, 
+            is_question_values[i]
+        ) for i in range(len(personas))
+    ]
+    enhanced_reviews = await asyncio.gather(*enhanced_review_tasks)
+    
+    # Add persona information
+    for i, review in enumerate(enhanced_reviews):
+        review["persona"] = personas[i]
+    
+    return enhanced_reviews
 
 
 async def select_best_review_for_evidence(reviews: List[Dict[str, Any]], node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
