@@ -200,14 +200,21 @@ async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode) -> List
     personas = ["teacher_rebuttal", "teacher_question", "student_rebuttal", "student_question"]
     
     # Generate initial reviews with different personas in parallel
+    print("\n=== Generating initial reviews with different personas ===")
     initial_review_tasks = [generate_initial_review_with_persona(node, tree, persona) for persona in personas]
     initial_reviews = await asyncio.gather(*initial_review_tasks)
+    
+    # Print initial reviews for each persona
+    for i, persona in enumerate(personas):
+        persona_name = persona.replace("_", " ").title()
+        print(f"\n[{persona_name}] Initial review:\n{initial_reviews[i]}")
     
     # Use each initial review as a search query and get search results
     search_tasks = [get_perplexity_search_results(review) for review in initial_reviews]
     search_results = await asyncio.gather(*search_tasks)
     
     # Enhance each review with its search results
+    print("\n=== Enhancing reviews with search results ===")
     is_question_values = [persona.endswith('question') for persona in personas]
     enhanced_review_tasks = [
         enhance_review_with_search_results(
@@ -220,9 +227,15 @@ async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode) -> List
     ]
     enhanced_reviews = await asyncio.gather(*enhanced_review_tasks)
     
-    # Add persona information
+    # Add persona information and print enhanced reviews
     for i, review in enumerate(enhanced_reviews):
-        review["persona"] = personas[i]
+        persona = personas[i]
+        persona_name = persona.replace("_", " ").title()
+        review["persona"] = persona
+        
+        review_type = review.get("tree", {}).get("type", "unknown")
+        review_content = review.get("tree", {}).get("content", "No content")
+        print(f"\n[{persona_name}] Enhanced {review_type}:\n{review_content[:200]}...")
     
     return enhanced_reviews
 
