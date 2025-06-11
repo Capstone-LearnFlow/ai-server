@@ -145,6 +145,30 @@ class ReviewService:
         combined_reviews = reviews + unselected_reviews
         print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
         
+        # Filter reviews based on filter_mode
+        if filter_mode > 0 and combined_reviews:
+            persona_map = {
+                1: "teacher_rebuttal",
+                2: "teacher_question", 
+                3: "student_rebuttal",
+                4: "student_question"
+            }
+            
+            if filter_mode in persona_map:
+                selected_persona = persona_map[filter_mode]
+                filtered_reviews = [review for review in combined_reviews if review.get("persona") == selected_persona]
+                
+                # If no reviews match the selected persona, keep all reviews
+                if filtered_reviews:
+                    combined_reviews = filtered_reviews
+                    print(f"Filtered to {len(combined_reviews)} reviews with persona: {selected_persona}")
+                else:
+                    print(f"No reviews found with persona {selected_persona}, keeping all reviews")
+            else:
+                print(f"Invalid filter_mode {filter_mode}, using all reviews")
+        else:
+            print("Using all reviews (filter_mode is 0 or no reviews available)")
+        
         # Rank the reviews and get the top ones
         ranked_reviews = await rank_reviews(combined_reviews, tree, review_num)
         print(f"Ranked reviews: {len(ranked_reviews)}")
