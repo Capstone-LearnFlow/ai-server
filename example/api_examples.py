@@ -155,8 +155,8 @@ def example_resetall():
     
     
 if __name__ == "__main__":
-    example_chat()
-    example_summary()
+    #example_chat()
+    #example_summary()
     example_review()
     # Uncomment below to test reset endpoints
     # example_reset()
