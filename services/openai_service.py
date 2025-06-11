@@ -242,8 +242,137 @@ async def generate_review_with_persona(node: TreeNode, tree: TreeNode, search_re
     # Parse the response and add the node's ID as the parent field
     review_data = json.loads(response.choices[0].message.content)
     review_data["parent"] = node.id
+    review_data["persona"] = persona
     
     return review_data
+
+
+async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode, search_results: str) -> List[Dict[str, Any]]:
+    """Generate reviews with different personas in parallel."""
+    personas = ["teacher_rebuttal", "teacher_question", "student_rebuttal", "student_question"]
+    
+    # Generate reviews with different personas in parallel
+    tasks = [generate_review_with_persona(node, tree, search_results, persona) for persona in personas]
+    reviews = await asyncio.gather(*tasks)
+    
+    return reviews
+
+
+async def select_best_review_for_evidence(reviews: List[Dict[str, Any]], node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
+    """Select the best review for a given evidence using Cerebras API."""
+    reviews_str = json.dumps(reviews, ensure_ascii=False, indent=2)
+    subtree = extract_subtree_to_root(node, tree)
+    subtree_json = subtree.model_dump()
+    subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
+    
+    prompt = (
+        "다음은 한 근거 노드에 대해 다양한 페르소나로 생성된 여러 개의 반론 또는 질문입니다.\n"
+        "주어진 노드와 트리 구조를 바탕으로, 가장 적절한 하나의 반론 또는 질문을 선택해주세요.\n"
+        "선택 기준:\n"
+        "1. 논리적 타당성: 근거와 직접적으로 관련이 있고 논리적으로 타당한가?\n"
+        "2. 교육적 가치: 학생의 비판적 사고를 자극하고 학습에 도움이 되는가?\n"
+        "3. 명확성: 학생이 이해하기 쉽게 작성되었는가?\n"
+        "4. 독창성: 새로운 관점이나 통찰을 제공하는가?\n\n"
+        f"[트리 구조]:\n{subtree_str}\n"
+        f"[검토 대상 nodeId]: {node.id}\n"
+        f"[반론/질문 목록]:\n{reviews_str}\n"
+        "가장 적절한 반론 또는 질문의 인덱스(0부터 시작)를 응답해주세요."
+    )
+    
+    response = await cerebras_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an educational assistant helping to select the most appropriate review (counterargument or question) for a given evidence. /nothink"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            },
+        ],
+        model=CEREBRAS_MODEL,
+        stream=False,
+        max_tokens=16382,
+        temperature=0.1,
+        top_p=0.95
+    )
+    
+    # Extract and clean the response content
+    raw_content = clean_cerebras_response(response.choices[0].message.content)
+    
+    # Extract the index from the response
+    try:
+        # Try to find a number in the response
+        index_match = re.search(r'\d+', raw_content)
+        if index_match:
+            selected_index = int(index_match.group())
+            if 0 <= selected_index < len(reviews):
+                return reviews[selected_index]
+        
+        # Fallback to the first review if no valid index is found
+        return reviews[0]
+    except Exception as e:
+        print(f"Error selecting best review: {e}")
+        return reviews[0]
+
+
+async def select_best_overall_review(selected_reviews: List[Dict[str, Any]], tree: TreeNode) -> Dict[str, Any]:
+    """Select the best overall review from the selected reviews for each evidence."""
+    if len(selected_reviews) <= 1:
+        return selected_reviews[0] if selected_reviews else None
+    
+    reviews_str = json.dumps(selected_reviews, ensure_ascii=False, indent=2)
+    tree_json = tree.model_dump()
+    tree_str = json.dumps(tree_json, ensure_ascii=False, indent=2)
+    
+    prompt = (
+        "다음은 여러 근거 노드에 대해 선택된 반론 또는 질문입니다.\n"
+        "주어진 트리 구조를 바탕으로, 전체 논증 구조에서 가장 적절한 하나의 반론 또는 질문을 선택해주세요.\n"
+        "선택 기준:\n"
+        "1. 논증 구조에서의 중요성: 논증 구조의 핵심 주장이나 근거에 관련된 반론/질문인가?\n"
+        "2. 논리적 타당성: 논리적으로 타당하고 설득력이 있는가?\n"
+        "3. 교육적 가치: 학생의 비판적 사고를 자극하고 학습에 도움이 되는가?\n"
+        "4. 명확성: 학생이 이해하기 쉽게 작성되었는가?\n\n"
+        f"[트리 구조]:\n{tree_str}\n"
+        f"[반론/질문 목록]:\n{reviews_str}\n"
+        "가장 적절한 반론 또는 질문의 인덱스(0부터 시작)를 응답해주세요."
+    )
+    
+    response = await cerebras_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an educational assistant helping to select the most appropriate review (counterargument or question) from a list of reviews. /nothink"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            },
+        ],
+        model=CEREBRAS_MODEL,
+        stream=False,
+        max_tokens=16382,
+        temperature=0.1,
+        top_p=0.95
+    )
+    
+    # Extract and clean the response content
+    raw_content = clean_cerebras_response(response.choices[0].message.content)
+    
+    # Extract the index from the response
+    try:
+        # Try to find a number in the response
+        index_match = re.search(r'\d+', raw_content)
+        if index_match:
+            selected_index = int(index_match.group())
+            if 0 <= selected_index < len(selected_reviews):
+                return selected_reviews[selected_index]
+        
+        # Fallback to the first review if no valid index is found
+        return selected_reviews[0]
+    except Exception as e:
+        print(f"Error selecting best overall review: {e}")
+        return selected_reviews[0]
 
 
 async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
