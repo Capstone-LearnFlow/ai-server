@@ -59,6 +59,58 @@ async def generate_chat_response(messages: List[Dict[str, Any]]) -> str:
     return response.choices[0].message.content
 
 
+async def generate_search_query(node: TreeNode, tree: TreeNode) -> str:
+    """Generate a search query for a given node using GPT-4.1-mini."""
+    # Extract the subtree from the node to the root
+    subtree = extract_subtree_to_root(node, tree)
+    subtree_json = subtree.model_dump()
+    subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
+    
+    prompt = (
+        "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
+        "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
+        "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
+        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 더 많은 정보를 찾기 위한 검색 쿼리를 생성하세요. "
+        "검색 쿼리는 한국어로 작성하고, 최대 5개의 키워드로 구성해주세요.\n"
+        f"[트리 구조]:\n{subtree_str}\n"
+        f"[검토 대상 nodeId]: {node.id}"
+    )
+    
+    response = await client.chat.completions.create(
+        model=OPENAI_MINI_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant who can generate concise search queries in Korean."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.5,
+        max_completion_tokens=100,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    
+    return response.choices[0].message.content.strip()
+
+
+async def get_perplexity_search_results(query: str) -> str:
+    """Get search results for a query using Perplexity API."""
+    response = await perplexity_client.chat.completions.create(
+        model=PERPLEXITY_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant who can search for information and provide concise, informative results in Korean."},
+            {"role": "user", "content": f"다음 주제에 대해 검색하고 관련 정보를 요약해주세요: {query}"}
+        ],
+        response_format={"type": "text"},
+        temperature=0.5,
+        max_completion_tokens=2048,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    
+    return response.choices[0].message.content.strip()
+
+
 async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     """Generate a review (counterargument or question) for a given node."""
     # Extract the subtree from the node to the root
