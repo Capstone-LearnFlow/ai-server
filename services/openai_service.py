@@ -59,31 +59,44 @@ async def generate_chat_response(messages: List[Dict[str, Any]]) -> str:
     return response.choices[0].message.content
 
 
-async def generate_search_query(node: TreeNode, tree: TreeNode) -> str:
-    """Generate a search query for a given node using GPT-4.1-mini."""
+async def generate_initial_review_with_persona(node: TreeNode, tree: TreeNode, persona: str) -> str:
+    """Generate an initial review with a specific persona as plain text (1-2 lines)."""
     # Extract the subtree from the node to the root
     subtree = extract_subtree_to_root(node, tree)
     subtree_json = subtree.model_dump()
     subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
     
+    persona_prompt = ""
+    if persona == "teacher_rebuttal":
+        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 논리적인 반론을 제시합니다."
+    elif persona == "teacher_question":
+        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 깊이 있는 질문을 제시합니다."
+    elif persona == "student_rebuttal":
+        persona_prompt = "당신은 비판적 사고력을 갖춘 학생으로, 다른 학생이 이해하기 쉽게 반론을 제시합니다."
+    elif persona == "student_question":
+        persona_prompt = "당신은 호기심 많은 학생으로, 다른 학생이 이해하기 쉽게 질문을 제시합니다."
+    
     prompt = (
+        f"{persona_prompt}\n\n"
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
         "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
-        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 더 많은 정보를 찾기 위한 검색 쿼리를 생성하세요. "
-        "검색 쿼리는 한국어로 작성하고, 최대 5개의 키워드로 구성해주세요.\n"
+        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 "
+        "반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
+        "응답은 반드시 1-2줄의 간결한 텍스트 형식으로 작성해주세요.\n"
+        "학생이 이해하기 쉬운 언어로 작성해주세요.\n"
         f"[트리 구조]:\n{subtree_str}\n"
         f"[검토 대상 nodeId]: {node.id}"
     )
     
     response = await client.chat.completions.create(
-        model=OPENAI_MINI_MODEL,
+        model=OPENAI_MODEL,
         messages=[
-            {"role": "system", "content": "You are a helpful assistant who can generate concise search queries in Korean."},
+            {"role": "system", "content": "You are a critical thinker who can generate concise counterarguments and questions in Korean based on specific personas."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.5,
-        max_completion_tokens=100,
+        temperature=0.7,
+        max_completion_tokens=200,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
@@ -111,140 +124,24 @@ async def get_perplexity_search_results(query: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-async def generate_review_with_persona(node: TreeNode, tree: TreeNode, search_results: str, persona: str) -> Dict[str, Any]:
-    """Generate a review with a specific persona."""
+async def enhance_review_with_search_results(initial_review: str, search_results: str, node: TreeNode, tree: TreeNode, is_question: bool) -> Dict[str, Any]:
+    """Enhance a review with search results and format it as a JSON object."""
     # Extract the subtree from the node to the root
     subtree = extract_subtree_to_root(node, tree)
     subtree_json = subtree.model_dump()
     subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
     
-    persona_prompt = ""
-    if persona == "teacher_rebuttal":
-        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 논리적인 반론을 제시합니다."
-    elif persona == "teacher_question":
-        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 깊이 있는 질문을 제시합니다."
-    elif persona == "student_rebuttal":
-        persona_prompt = "당신은 비판적 사고력을 갖춘 학생으로, 다른 학생이 이해하기 쉽게 반론을 제시합니다."
-    elif persona == "student_question":
-        persona_prompt = "당신은 호기심 많은 학생으로, 다른 학생이 이해하기 쉽게 질문을 제시합니다."
-    
     prompt = (
-        f"{persona_prompt}\n\n"
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
-        "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
-        "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
-        "IMPORTANT: 반론에는 반드시 child에 type이 근거인 노드가 포함되어야 하며, 질문은 명확하고 구체적이어야 합니다.\n"
-        "학생이 이해하기 쉬운 언어로 작성해주세요.\n"
-        "응답은 반드시 JSON 스키마에 맞춰주세요.\n"
+        "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다.\n"
         f"[트리 구조]:\n{subtree_str}\n"
-        f"[검토 대상 nodeId]: {node.id}\n"
-        f"[검색 결과]:\n{search_results}"
+        f"[검토 대상 nodeId]: {node.id}\n\n"
+        f"[초기 {('질문' if is_question else '반론')}]:\n{initial_review}\n\n"
+        f"[검색 결과]:\n{search_results}\n\n"
+        f"위 정보를 바탕으로, 초기 {('질문' if is_question else '반론')}을 검색 결과를 활용하여 보강하고, "
+        f"JSON 형식으로 작성해주세요. 학생이 이해하기 쉬운 언어로 작성해주세요.\n"
     )
-    
-    response = await client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions in Korean based on specific personas."},
-            {"role": "user", "content": prompt}
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "parent_node_argument_question",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "tree": {
-                            "type": "object",
-                            "anyOf": [
-                                {
-                                    # 반론 타입일 경우의 스키마
-                                    "properties": {
-                                        "type": {
-                                            "type": "string",
-                                            "const": "반론",
-                                            "description": "Indicates this is an argument node."
-                                        },
-                                        "content": {
-                                            "type": "string",
-                                            "description": "The content of the argument."
-                                        },
-                                        "summary": {
-                                            "type": "string",
-                                            "description": "A brief summary of the argument."
-                                        },
-                                        "child": {
-                                            "type": "array",
-                                            "description": "Evidence supporting the argument. IMPORTANT: 한개 이상의 근거를 반드시 포함하세요.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "type": {
-                                                        "type": "string",
-                                                        "const": "근거",
-                                                        "description": "Indicates this is an evidence node."
-                                                    },
-                                                    "content": {
-                                                        "type": "string",
-                                                        "description": "The content of the evidence."
-                                                    },
-                                                    "summary": {
-                                                        "type": "string",
-                                                        "description": "A brief summary of the evidence."
-                                                    }
-                                                },
-                                                "required": ["type", "content", "summary"],
-                                                "additionalProperties": False
-                                            }
-                                        }
-                                    },
-                                    "required": ["type", "content", "summary", "child"],
-                                    "additionalProperties": False
-                                },
-                                {
-                                    # 질문 타입일 경우의 스키마
-                                    "properties": {
-                                        "type": {
-                                            "type": "string",
-                                            "const": "질문",
-                                            "description": "Indicates this is a question node."
-                                        },
-                                        "content": {
-                                            "type": "string",
-                                            "description": "The content of the question."
-                                        },
-                                        "summary": {
-                                            "type": "string",
-                                            "description": "A brief summary of the question."
-                                        }
-                                    },
-                                    "required": ["type", "content", "summary"],
-                                    "additionalProperties": False
-                                }
-                            ]
-                        }
-                    },
-                    "required": ["tree"],
-                    "additionalProperties": False
-                }
-            }
-        },
-        temperature=0.7,
-        max_completion_tokens=2048,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0,
-        store=True
-    )
-    
-    # Parse the response and add the node's ID as the parent field
-    review_data = json.loads(response.choices[0].message.content)
-    review_data["parent"] = node.id
-    review_data["persona"] = persona
-    
-    return review_data
 
 
 async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode, search_results: str) -> List[Dict[str, Any]]:
