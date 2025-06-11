@@ -192,9 +192,9 @@ class ReviewService:
         """Generate reviews for the given nodes in parallel using the new workflow.
         
         Each node will go through the following steps:
-        1. Generate search query with GPT-4.1-mini
-        2. Get search results from Perplexity API
-        3. Generate reviews with different personas in parallel
+        1. Generate initial reviews with different personas (teacher rebuttal, teacher question, student rebuttal, student question) using GPT-4.1 as plain text
+        2. Use each review as a search query for Perplexity API to get search results
+        3. Enhance each review with its search results using GPT-4.1
         4. Select the best review for each evidence using Cerebras API
         """
         print("Generating reviews with new workflow for multiple nodes")
