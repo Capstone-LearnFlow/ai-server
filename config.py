@@ -12,5 +12,5 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 cerebras_client = AsyncOpenAI(base_url="https://api.cerebras.ai/v1", api_key=os.getenv("CEREBRAS_API_KEY"))
 
 # Configuration constants
-OPENAI_MODEL = "gpt-4.1-mini"
+OPENAI_MODEL = "gpt-4.1"
 CEREBRAS_MODEL = "qwen-3-32b"
