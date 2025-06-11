@@ -242,6 +242,7 @@ async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode) -> List
 
 async def select_best_review_for_evidence(reviews: List[Dict[str, Any]], node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     """Select the best review for a given evidence using Cerebras API."""
+    print("\n=== Selecting best review for evidence ===")
     reviews_str = json.dumps(reviews, ensure_ascii=False, indent=2)
     subtree = extract_subtree_to_root(node, tree)
     subtree_json = subtree.model_dump()
@@ -289,12 +290,28 @@ async def select_best_review_for_evidence(reviews: List[Dict[str, Any]], node: T
         if index_match:
             selected_index = int(index_match.group())
             if 0 <= selected_index < len(reviews):
-                return reviews[selected_index]
+                selected_review = reviews[selected_index]
+                persona = selected_review.get("persona", "unknown")
+                persona_name = persona.replace("_", " ").title()
+                review_type = selected_review.get("tree", {}).get("type", "unknown")
+                review_content = selected_review.get("tree", {}).get("content", "No content")
+                
+                print(f"\n=== Selected Review for Evidence Node {node.id} ===")
+                print(f"Selected Persona: {persona_name}")
+                print(f"Review Type: {review_type}")
+                print(f"Content: {review_content[:200]}...")
+                return selected_review
         
         # Fallback to the first review if no valid index is found
-        return reviews[0]
+        print("\nWarning: No valid index found, falling back to first review.")
+        selected_review = reviews[0]
+        persona = selected_review.get("persona", "unknown")
+        persona_name = persona.replace("_", " ").title()
+        print(f"Fallback Persona: {persona_name}")
+        return selected_review
     except Exception as e:
         print(f"Error selecting best review: {e}")
+        print("Falling back to first review due to error.")
         return reviews[0]
 
 
