@@ -111,29 +111,41 @@ async def get_perplexity_search_results(query: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
-    """Generate a review (counterargument or question) for a given node."""
+async def generate_review_with_persona(node: TreeNode, tree: TreeNode, search_results: str, persona: str) -> Dict[str, Any]:
+    """Generate a review with a specific persona."""
     # Extract the subtree from the node to the root
     subtree = extract_subtree_to_root(node, tree)
     subtree_json = subtree.model_dump()
     subtree_str = json.dumps(subtree_json, ensure_ascii=False, indent=2)
     
+    persona_prompt = ""
+    if persona == "teacher_rebuttal":
+        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 논리적인 반론을 제시합니다."
+    elif persona == "teacher_question":
+        persona_prompt = "당신은 전문 지식을 갖춘 선생님으로, 학생이 이해하기 쉽게 깊이 있는 질문을 제시합니다."
+    elif persona == "student_rebuttal":
+        persona_prompt = "당신은 비판적 사고력을 갖춘 학생으로, 다른 학생이 이해하기 쉽게 반론을 제시합니다."
+    elif persona == "student_question":
+        persona_prompt = "당신은 호기심 많은 학생으로, 다른 학생이 이해하기 쉽게 질문을 제시합니다."
+    
     prompt = (
+        f"{persona_prompt}\n\n"
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
         "아래 트리 구조는 검토 대상 노드부터 루트까지의 경로를 포함하는 서브트리입니다. "
         "이를 참고하여, 주어진 nodeId(검토 대상 노드)에 대해 비판적 사고를 바탕으로 반론(반박) 또는 날카로운 질문을 한국어로 생성하세요. "
         "IMPORTANT: 반론에는 반드시 child에 type이 근거인 노드가 포함되어야 하며, 질문은 명확하고 구체적이어야 합니다.\n"
+        "학생이 이해하기 쉬운 언어로 작성해주세요.\n"
         "응답은 반드시 JSON 스키마에 맞춰주세요.\n"
         f"[트리 구조]:\n{subtree_str}\n"
-        f"[검토 대상 nodeId]: {node.id}"
+        f"[검토 대상 nodeId]: {node.id}\n"
+        f"[검색 결과]:\n{search_results}"
     )
-    print("Prompt for review generation:", prompt)
-
+    
     response = await client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[
-            {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions in Korean."},
+            {"role": "system", "content": "You are a critical thinker who can generate counterarguments and questions in Korean based on specific personas."},
             {"role": "user", "content": prompt}
         ],
         response_format={
