@@ -317,8 +317,28 @@ async def select_best_review_for_evidence(reviews: List[Dict[str, Any]], node: T
 
 async def select_best_overall_review(selected_reviews: List[Dict[str, Any]], tree: TreeNode) -> Dict[str, Any]:
     """Select the best overall review from the selected reviews for each evidence."""
+    print("\n=== Selecting best overall review ===")
+    
     if len(selected_reviews) <= 1:
-        return selected_reviews[0] if selected_reviews else None
+        if selected_reviews:
+            selected_review = selected_reviews[0]
+            persona = selected_review.get("persona", "unknown")
+            persona_name = persona.replace("_", " ").title()
+            review_type = selected_review.get("tree", {}).get("type", "unknown")
+            print(f"\nOnly one review available - automatically selected:")
+            print(f"Persona: {persona_name}")
+            print(f"Review Type: {review_type}")
+            return selected_review
+        return None
+    
+    # Print all available reviews with their personas
+    print("\nAvailable reviews for selection:")
+    for i, review in enumerate(selected_reviews):
+        persona = review.get("persona", "unknown")
+        persona_name = persona.replace("_", " ").title()
+        review_type = review.get("tree", {}).get("type", "unknown")
+        parent_id = review.get("parent", "unknown")
+        print(f"{i}. [{persona_name}] {review_type} for node {parent_id}")
     
     reviews_str = json.dumps(selected_reviews, ensure_ascii=False, indent=2)
     tree_json = tree.model_dump()
@@ -365,12 +385,32 @@ async def select_best_overall_review(selected_reviews: List[Dict[str, Any]], tre
         if index_match:
             selected_index = int(index_match.group())
             if 0 <= selected_index < len(selected_reviews):
-                return selected_reviews[selected_index]
+                selected_review = selected_reviews[selected_index]
+                persona = selected_review.get("persona", "unknown")
+                persona_name = persona.replace("_", " ").title()
+                review_type = selected_review.get("tree", {}).get("type", "unknown")
+                content = selected_review.get("tree", {}).get("content", "No content")
+                parent_id = selected_review.get("parent", "unknown")
+                
+                print(f"\n=== Best Overall Review Selected ===")
+                print(f"Selected Index: {selected_index}")
+                print(f"Persona: {persona_name}")
+                print(f"Review Type: {review_type}")
+                print(f"For Node: {parent_id}")
+                print(f"Content Preview: {content[:200]}...")
+                
+                return selected_review
         
         # Fallback to the first review if no valid index is found
-        return selected_reviews[0]
+        print("\nWarning: No valid index found in Cerebras response, falling back to first review.")
+        selected_review = selected_reviews[0]
+        persona = selected_review.get("persona", "unknown")
+        persona_name = persona.replace("_", " ").title()
+        print(f"Fallback Persona: {persona_name}")
+        return selected_review
     except Exception as e:
         print(f"Error selecting best overall review: {e}")
+        print("Falling back to first review due to error.")
         return selected_reviews[0]
 
 
