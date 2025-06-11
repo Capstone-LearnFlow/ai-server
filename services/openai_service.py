@@ -239,7 +239,18 @@ async def generate_reviews_with_personas(node: TreeNode, tree: TreeNode) -> List
     
     # Generate initial reviews with different personas in parallel
     print("\n=== Generating initial reviews with different personas ===")
-    initial_review_tasks = [generate_initial_review_with_persona(node, tree, persona) for persona in personas]
+    
+    # Create a list to store all tasks
+    initial_review_tasks = []
+    
+    # Add tasks for each persona, using the appropriate function
+    for persona in personas:
+        if persona.endswith("rebuttal"):
+            initial_review_tasks.append(generate_initial_rebuttal(node, tree, persona))
+        elif persona.endswith("question"):
+            initial_review_tasks.append(generate_initial_question(node, tree, persona))
+    
+    # Wait for all tasks to complete
     initial_reviews = await asyncio.gather(*initial_review_tasks)
     
     # Print initial reviews for each persona
