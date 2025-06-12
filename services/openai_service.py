@@ -153,7 +153,7 @@ async def get_perplexity_search_results(query: str) -> str:
         model=PERPLEXITY_MODEL,
         messages=[
             {"role": "system", "content": "You are a helpful assistant who can search for information and provide concise, informative results in Korean."},
-            {"role": "user", "content": f"다음 주제에 대해 검색하고 관련 정보를 요약해주세요: {query}"}
+            {"role": "user", "content": f"다음 주제에 대해 검색하고 관련 정보를 요약해주세요. 평문이라면 평문으로, 질문이라면 질문으로 요약해주세요: {query}"}
         ],
         response_format={"type": "text"},
         temperature=0.5,
