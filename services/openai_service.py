@@ -163,7 +163,8 @@ async def get_perplexity_search_results(query: str) -> str:
         presence_penalty=0
     )
     
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return content.strip() if content is not None else ""
 
 
 async def enhance_review_with_search_results(initial_review: str, search_results: str, node: TreeNode, tree: TreeNode, is_question: bool) -> Dict[str, Any]:
@@ -233,7 +234,19 @@ async def enhance_review_with_search_results(initial_review: str, search_results
     )
     
     # Parse the response and add the node's ID as the parent field
-    review_data = json.loads(response.choices[0].message.content)
+    content = response.choices[0].message.content
+    if content is None:
+        # Fallback if content is None
+        review_data = {
+            "tree": {
+                "type": "질문" if is_question else "반론",
+                "content": "API 응답을 받지 못했습니다.",
+                "summary": "API 오류"
+            }
+        }
+    else:
+        review_data = json.loads(content)
+    
     review_data["parent"] = node.id
     
     return review_data
