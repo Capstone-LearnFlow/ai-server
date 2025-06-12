@@ -285,6 +285,10 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
                     if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 1:
                         should_exclude = True
                     
+                    # Exclude if part of claim-rebuttal-claim pattern
+                    if is_in_claim_rebuttal_claim_pattern(node_id, parent_map, current_tree):
+                        should_exclude = True
+                    
             # Include node if it's not excluded and has been updated
             if not should_exclude and node_id in previous_tree and node.updated_at != previous_tree[node_id].updated_at:
                 new_nodes.append(node)
