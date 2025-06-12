@@ -36,7 +36,7 @@ async def generate_cerebras_summary(content: str) -> str:
     
     # Extract and clean the response content
     raw_content = response.choices[0].message.content
-    return clean_cerebras_response(raw_content)
+    return clean_cerebras_response(raw_content if raw_content is not None else "")
 
 
 async def generate_summary(content: str) -> str:
@@ -99,7 +99,8 @@ async def generate_initial_rebuttal(node: TreeNode, tree: TreeNode, persona: str
         presence_penalty=0
     )
     
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return content.strip() if content is not None else ""
 
 
 async def generate_initial_question(node: TreeNode, tree: TreeNode, persona: str) -> str:
@@ -142,7 +143,8 @@ async def generate_initial_question(node: TreeNode, tree: TreeNode, persona: str
         presence_penalty=0
     )
     
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return content.strip() if content is not None else ""
 
 
 async def get_perplexity_search_results(query: str) -> str:
