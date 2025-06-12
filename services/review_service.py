@@ -126,24 +126,48 @@ class ReviewService:
         current_tree_dict = get_all_nodes(tree)
         print("Previous tree exists:", previous_tree is not None)
         
-        # Determine which nodes to review
-        new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
-        print(f"New nodes to review: {len(new_nodes)}")
-        
-        # Generate reviews for new nodes if available
+        # Initialize reviews list
         reviews = []
-        if new_nodes:
-            reviews = await self._generate_reviews_for_nodes(new_nodes, tree)
-            print(f"Generated reviews: {len(reviews)}")
-        # If there are no new nodes and no unselected reviews, raise an exception
-        elif not unselected_reviews:
-            raise ValueError("No '근거' type nodes found to review and no unselected reviews available. Please add or update nodes of type '근거'.")
-        else:
-            print(f"No new nodes to review, using {len(unselected_reviews)} unselected reviews")
         
-        # Combine newly generated reviews with previously unselected reviews
-        combined_reviews = reviews + unselected_reviews
-        print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
+        if use_unselected:
+            # When using unselected reviews, determine only new nodes to review
+            print("Using previously unselected reviews if available")
+            new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
+            print(f"New nodes to review: {len(new_nodes)}")
+            
+            # Generate reviews for new nodes if available
+            if new_nodes:
+                reviews = await self._generate_reviews_for_nodes(new_nodes, tree)
+                print(f"Generated reviews for new nodes: {len(reviews)}")
+            # If there are no new nodes and no unselected reviews, raise an exception
+            elif not unselected_reviews:
+                raise ValueError("No '근거' type nodes found to review and no unselected reviews available. Please add or update nodes of type '근거'.")
+            else:
+                print(f"No new nodes to review, using {len(unselected_reviews)} unselected reviews")
+            
+            # Combine newly generated reviews with previously unselected reviews
+            combined_reviews = reviews + unselected_reviews
+            print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
+        else:
+            # When not using unselected reviews, find all evidence nodes in the tree
+            print("Not using previously unselected reviews, generating new reviews for all evidence nodes")
+            all_evidence_nodes = []
+            for node_id, node in current_tree_dict.items():
+                if node.type in ["근거", "답변"]:
+                    all_evidence_nodes.append(node)
+            
+            print(f"Found {len(all_evidence_nodes)} evidence nodes in the current tree")
+            
+            # Generate reviews for all evidence nodes
+            if all_evidence_nodes:
+                reviews = await self._generate_reviews_for_nodes(all_evidence_nodes, tree)
+                print(f"Generated reviews for all evidence nodes: {len(reviews)}")
+            else:
+                raise ValueError("No '근거' or '답변' type nodes found in the current tree. Please add nodes of these types.")
+            
+            # Use only newly generated reviews
+            combined_reviews = reviews
+            print(f"Using only newly generated reviews: {len(combined_reviews)}")
         
         # Filter reviews based on filter_mode
         if filter_mode > 0 and combined_reviews:
