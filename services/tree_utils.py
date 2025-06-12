@@ -231,8 +231,8 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
                     if parent_node.type == "반론":
                         should_exclude = True
                     
-                    # Exclude if sibling transitions > 2
-                    if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 2:
+                    # Exclude if sibling transitions > 1
+                    if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 1:
                         should_exclude = True
                     
             # Include node if it's not excluded and has been updated
