@@ -233,8 +233,8 @@ class ReviewService:
         
         return ranked_reviews
     
-    def _determine_nodes_to_review(self, current_tree_dict: Dict[str, TreeNode], tree: TreeNode, previous_tree: Optional[TreeNode]) -> List[TreeNode]:
-        """Determine which nodes need to be reviewed."""
+    def _determine_nodes_to_review(self, current_tree_dict: Dict[str, TreeNode], tree: TreeNode, previous_tree: Optional[TreeNode], used_evidence_ids: List[str]) -> List[TreeNode]:
+        """Determine which nodes need to be reviewed, excluding previously used evidence IDs."""
         if previous_tree:
             # Get previous tree state
             previous_tree_dict = get_all_nodes(previous_tree)
@@ -252,8 +252,14 @@ class ReviewService:
                     new_nodes.append(node)
         
         # Filter out nodes that already have anticipated counterarguments
+        # and nodes that have been previously used
         filtered_nodes = []
         for node in new_nodes:
+            # Skip if the node ID has been used before
+            if node.id in used_evidence_ids:
+                print(f"Excluding node {node.id} from review as it was previously used")
+                continue
+                
             # Check if the node has any child that is a counterargument
             has_counterargument = False
             for child in node.child:
