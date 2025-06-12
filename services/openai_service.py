@@ -184,6 +184,8 @@ async def enhance_review_with_search_results(initial_review: str, search_results
         f"[검색 결과]:\n{search_results}\n\n"
         f"위 정보를 바탕으로, 초기 {review_type}을 검색 결과를 활용하여 보강하고, "
         f"JSON 형식으로 작성해주세요. 학생이 이해하기 쉬운 언어로 작성해주세요.\n\n"
+        f"중요: 질문 타입일 경우 절대 반론 구조를 포함하지 마세요. 질문은 단순히 질문만 포함해야 합니다.\n"
+        f"반론 타입일 경우 질문 구조를 포함하지 마세요. 각 타입에 맞는 정확한 구조만 사용하세요.\n\n"
         f"JSON 형식은 다음과 같습니다:\n"
         f"- 질문인 경우:\n"
         "```json\n"
