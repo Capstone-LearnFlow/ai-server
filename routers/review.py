@@ -19,7 +19,8 @@ async def review(request: ReviewRequest):
             request.review_num,
             request.student_id,
             request.assignment_id,
-            request.filter_mode
+            request.filter_mode,
+            request.use_unselected
         )
         return {"data": ranked_reviews}
     except ValidationError as ve:
