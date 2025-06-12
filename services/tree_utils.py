@@ -253,6 +253,10 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
                     # This handles cases where sibling evidence should only be reviewed once
                     if count_sibling_transitions(parent_node.id, parent_map, sibling_map) > 1:
                         should_exclude = True
+                    
+                    # Exclude if part of claim-rebuttal-claim pattern
+                    if is_in_claim_rebuttal_claim_pattern(node_id, parent_map, current_tree):
+                        should_exclude = True
             
             if not should_exclude:
                 new_nodes.append(node)
