@@ -108,7 +108,7 @@ class ReviewService:
                     except Exception as e:
                         print(f"Error removing state file {filename}: {e}")
     
-    async def process_review_request(self, tree: TreeNode, review_num: int, student_id: str, assignment_id: str, filter_mode: int = 2, use_unselected: bool = True) -> List[Dict[str, Any]]:
+    async def process_review_request(self, tree: TreeNode, review_num: int, student_id: str, assignment_id: str, filter_mode: int = 0, use_unselected: bool = True) -> List[Dict[str, Any]]:
         """Process a review request and return ranked reviews."""
         print("=== Review Service: Processing request ===")
         print(f"Tree root ID: {tree.id}")
