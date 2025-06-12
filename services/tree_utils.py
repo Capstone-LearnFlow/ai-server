@@ -199,7 +199,7 @@ def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, T
             if node_id in parent_map:
                 parent_node = parent_map[node_id]
                 if parent_node:
-                    # Exclude if parent is a '반론'
+                    # Exclude if parent is a '반론' (rebuttal)
                     if parent_node.type == "반론":
                         should_exclude = True
                     
