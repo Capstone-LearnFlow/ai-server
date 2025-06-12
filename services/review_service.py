@@ -162,7 +162,7 @@ class ReviewService:
             print("Not using previously unselected reviews, generating new reviews for eligible evidence nodes")
             all_evidence_nodes = []
             for node_id, node in current_tree_dict.items():
-                if node.type in ["근거", "답변"] and node.id not in used_evidence_ids:
+                if node.type in ["근거"] and node.id not in used_evidence_ids:
                     all_evidence_nodes.append(node)
             
             print(f"Found {len(all_evidence_nodes)} eligible evidence nodes in the current tree")
@@ -248,7 +248,7 @@ class ReviewService:
             # First time seeing any tree, filter for nodes of type '근거' or '답변'
             new_nodes = []
             for node_id, node in current_tree_dict.items():
-                if node.type in ["근거", "답변"]:
+                if node.type in ["근거"]:
                     new_nodes.append(node)
         
         # Filter out nodes that already have anticipated counterarguments
