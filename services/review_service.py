@@ -128,11 +128,12 @@ class ReviewService:
         print(f"Assignment ID: {assignment_id}")
         
         # Get current state for this student and assignment
-        previous_tree, unselected_reviews = self._get_state(student_id, assignment_id)
+        previous_tree, unselected_reviews, used_evidence_ids = self._get_state(student_id, assignment_id)
         
         # Get current tree state as dictionary
         current_tree_dict = get_all_nodes(tree)
         print("Previous tree exists:", previous_tree is not None)
+        print(f"Previously used evidence IDs: {len(used_evidence_ids)}")
         
         # Initialize reviews list
         reviews = []
@@ -140,7 +141,7 @@ class ReviewService:
         if use_unselected:
             # When using unselected reviews, determine only new nodes to review
             print("Using previously unselected reviews if available")
-            new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree)
+            new_nodes = self._determine_nodes_to_review(current_tree_dict, tree, previous_tree, used_evidence_ids)
             print(f"New nodes to review: {len(new_nodes)}")
             
             # Generate reviews for new nodes if available
@@ -157,21 +158,21 @@ class ReviewService:
             combined_reviews = reviews + unselected_reviews
             print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
         else:
-            # When not using unselected reviews, find all evidence nodes in the tree
-            print("Not using previously unselected reviews, generating new reviews for all evidence nodes")
+            # When not using unselected reviews, find all evidence nodes in the tree not previously used
+            print("Not using previously unselected reviews, generating new reviews for eligible evidence nodes")
             all_evidence_nodes = []
             for node_id, node in current_tree_dict.items():
-                if node.type in ["근거", "답변"]:
+                if node.type in ["근거", "답변"] and node.id not in used_evidence_ids:
                     all_evidence_nodes.append(node)
             
-            print(f"Found {len(all_evidence_nodes)} evidence nodes in the current tree")
+            print(f"Found {len(all_evidence_nodes)} eligible evidence nodes in the current tree")
             
-            # Generate reviews for all evidence nodes
+            # Generate reviews for all eligible evidence nodes
             if all_evidence_nodes:
                 reviews = await self._generate_reviews_for_nodes(all_evidence_nodes, tree)
-                print(f"Generated reviews for all evidence nodes: {len(reviews)}")
+                print(f"Generated reviews for eligible evidence nodes: {len(reviews)}")
             else:
-                raise ValueError("No '근거' or '답변' type nodes found in the current tree. Please add nodes of these types.")
+                raise ValueError("No unused '근거' or '답변' type nodes found in the current tree. Please add nodes of these types.")
             
             # Use only newly generated reviews
             combined_reviews = reviews
@@ -216,11 +217,19 @@ class ReviewService:
                 ranked_reviews.remove(best_review)
                 ranked_reviews.insert(0, best_review)
         
+        # Track selected evidence IDs from ranked reviews
+        new_used_evidence_ids = used_evidence_ids.copy()
+        for review in ranked_reviews:
+            parent_id = review.get("parent", "")
+            if parent_id and parent_id not in new_used_evidence_ids:
+                new_used_evidence_ids.append(parent_id)
+                print(f"Tracking newly used evidence ID: {parent_id}")
+        
         # Update unselected reviews for future use
         new_unselected_reviews = self._calculate_unselected_reviews(combined_reviews, ranked_reviews)
         
-        # Store the current tree and unselected reviews for future comparison
-        self._save_state(student_id, assignment_id, deepcopy(tree), new_unselected_reviews)
+        # Store the current tree, unselected reviews and used evidence IDs for future comparison
+        self._save_state(student_id, assignment_id, deepcopy(tree), new_unselected_reviews, new_used_evidence_ids)
         
         return ranked_reviews
     
