@@ -50,6 +50,7 @@ class ReviewRequest(BaseModel):
     student_id: str  # Student identifier
     assignment_id: str  # Assignment identifier
     filter_mode: int = 0  # 0: all, 1: teacher rebuttal, 2: teacher question, 3: student rebuttal, 4: student question
+    use_unselected: bool = True  # Whether to use previously unselected reviews or generate new ones
 
 
 class EvidenceNode(BaseModel):
