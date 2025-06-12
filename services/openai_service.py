@@ -469,6 +469,47 @@ async def select_best_overall_review(selected_reviews: List[Dict[str, Any]], tre
         return selected_reviews[0]
 
 
+def validate_review_type(review: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and fix review type to ensure it adheres to the correct structure."""
+    persona = review.get("persona", "")
+    tree_data = review.get("tree", {})
+    review_type = tree_data.get("type", "")
+    
+    # For question types, ensure no child nodes
+    if "question" in persona or review_type == "질문":
+        # Force the type to be "질문"
+        tree_data["type"] = "질문"
+        
+        # Remove any child nodes if present
+        if "child" in tree_data:
+            del tree_data["child"]
+            print(f"Removed child nodes from question type for consistency")
+    
+    # For rebuttal types, ensure proper structure
+    elif "rebuttal" in persona or review_type == "반론":
+        # Force the type to be "반론"
+        tree_data["type"] = "반론"
+        
+        # Ensure child array exists with at least one evidence node
+        if "child" not in tree_data or not tree_data["child"]:
+            tree_data["child"] = [{
+                "type": "근거",
+                "content": "이 반론에 대한 근거가 필요합니다.",
+                "summary": "근거 필요"
+            }]
+            print(f"Added missing evidence node to rebuttal")
+        
+        # Ensure all child nodes are evidence type
+        for child in tree_data["child"]:
+            if child.get("type") != "근거":
+                child["type"] = "근거"
+                print(f"Fixed child node type to '근거'")
+    
+    # Update the tree in the review
+    review["tree"] = tree_data
+    return review
+
+
 async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     """Generate a review (counterargument or question) for a given node using the new workflow."""
     print(f"Generating review for node {node.id} with new workflow")
@@ -481,7 +522,10 @@ async def generate_review(node: TreeNode, tree: TreeNode) -> Dict[str, Any]:
     selected_review = await select_best_review_for_evidence(reviews, node, tree)
     print(f"Selected best review of type: {selected_review.get('tree', {}).get('type', 'unknown')}")
     
-    return selected_review
+    # Step 3: Validate and fix the review type to ensure correct structure
+    validated_review = validate_review_type(selected_review)
+    
+    return validated_review
 
 
 async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num: int) -> List[Dict[str, Any]]:
