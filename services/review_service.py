@@ -234,7 +234,23 @@ class ReviewService:
                 if node.type in ["근거", "답변"]:
                     new_nodes.append(node)
         
-        return new_nodes
+        # Filter out nodes that already have anticipated counterarguments
+        filtered_nodes = []
+        for node in new_nodes:
+            # Check if the node has any child that is a counterargument
+            has_counterargument = False
+            for child in node.child:
+                if child.type == "반론":
+                    has_counterargument = True
+                    break
+            
+            # Only include nodes without counterarguments
+            if not has_counterargument:
+                filtered_nodes.append(node)
+            else:
+                print(f"Excluding node {node.id} from review as it already has anticipated counterarguments")
+        
+        return filtered_nodes
     
     async def _generate_reviews_for_nodes(self, nodes: List[TreeNode], tree: TreeNode) -> List[Dict[str, Any]]:
         """Generate reviews for the given nodes in parallel using the new workflow.
