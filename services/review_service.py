@@ -10,7 +10,7 @@ from services.openai_service import generate_review, rank_reviews
 
 class ReviewService:
     def __init__(self):
-        # In-memory cache of previous_tree and unselected_reviews per student and assignment
+        # In-memory cache of previous_tree, unselected_reviews, and used_evidence_ids per student and assignment
         self.state_cache = {}
         
         # Ensure data directory exists
@@ -21,13 +21,17 @@ class ReviewService:
         """Get the file path for a student's assignment data."""
         return os.path.join(self.data_dir, f"{student_id}_{assignment_id}.json")
     
-    def _get_state(self, student_id: str, assignment_id: str) -> Tuple[Optional[TreeNode], List[Dict[str, Any]]]:
+    def _get_state(self, student_id: str, assignment_id: str) -> Tuple[Optional[TreeNode], List[Dict[str, Any]], List[str]]:
         """Get the state for a student's assignment, either from cache or from file."""
         cache_key = f"{student_id}_{assignment_id}"
         
         # Check if state is in cache
         if cache_key in self.state_cache:
-            return self.state_cache[cache_key]["previous_tree"], self.state_cache[cache_key]["unselected_reviews"]
+            return (
+                self.state_cache[cache_key]["previous_tree"], 
+                self.state_cache[cache_key]["unselected_reviews"],
+                self.state_cache[cache_key]["used_evidence_ids"]
+            )
         
         # Try to load from file
         file_path = self._get_file_path(student_id, assignment_id)
@@ -41,28 +45,31 @@ class ReviewService:
                     previous_tree = TreeNode.parse_obj(data["previous_tree"])
                 
                 unselected_reviews = data.get("unselected_reviews", [])
+                used_evidence_ids = data.get("used_evidence_ids", [])
                 
                 # Update cache
                 self.state_cache[cache_key] = {
                     "previous_tree": previous_tree,
-                    "unselected_reviews": unselected_reviews
+                    "unselected_reviews": unselected_reviews,
+                    "used_evidence_ids": used_evidence_ids
                 }
                 
-                return previous_tree, unselected_reviews
+                return previous_tree, unselected_reviews, used_evidence_ids
             except Exception as e:
                 print(f"Error loading state from file: {e}")
         
         # Return default empty state if no data found
-        return None, []
+        return None, [], []
     
-    def _save_state(self, student_id: str, assignment_id: str, previous_tree: Optional[TreeNode], unselected_reviews: List[Dict[str, Any]]):
+    def _save_state(self, student_id: str, assignment_id: str, previous_tree: Optional[TreeNode], unselected_reviews: List[Dict[str, Any]], used_evidence_ids: List[str]):
         """Save the state for a student's assignment to both cache and file."""
         cache_key = f"{student_id}_{assignment_id}"
         
         # Update cache
         self.state_cache[cache_key] = {
             "previous_tree": previous_tree,
-            "unselected_reviews": unselected_reviews
+            "unselected_reviews": unselected_reviews,
+            "used_evidence_ids": used_evidence_ids
         }
         
         # Save to file
@@ -70,7 +77,8 @@ class ReviewService:
         try:
             data = {
                 "previous_tree": previous_tree.dict() if previous_tree else None,
-                "unselected_reviews": unselected_reviews
+                "unselected_reviews": unselected_reviews,
+                "used_evidence_ids": used_evidence_ids
             }
             
             with open(file_path, 'w', encoding='utf-8') as f:
