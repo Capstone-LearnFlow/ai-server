@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 load_dotenv()
 
 # Initialize AsyncOpenAI client
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(base_url=os.getenv("LITELLM_BASE_URL"), api_key=os.getenv("LITELLM_API_KEY"))
 
 # Initialize Perplexity API client
 perplexity_client = AsyncOpenAI(base_url="https://api.perplexity.ai", api_key=os.getenv("PPLX_API_KEY"))
