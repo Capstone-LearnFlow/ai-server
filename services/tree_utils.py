@@ -169,6 +169,52 @@ def build_sibling_map(tree_root: TreeNode) -> Dict[str, List[str]]:
     process_node(tree_root)
     return sibling_map
 
+def is_in_claim_rebuttal_claim_pattern(node_id: str, parent_map: Dict[str, TreeNode], current_tree: Dict[str, TreeNode]) -> bool:
+    """
+    Check if a node is part of a claim-rebuttal-claim pattern.
+    
+    Args:
+        node_id: The ID of the node to check
+        parent_map: Map of node IDs to their parent nodes
+        current_tree: Dictionary of all nodes in the tree
+        
+    Returns:
+        True if the node is part of a claim-rebuttal-claim pattern, False otherwise
+    """
+    # If the node doesn't have a parent, it can't be in the pattern
+    if node_id not in parent_map or not parent_map[node_id]:
+        return False
+    
+    # Get the parent node (claim)
+    parent_node = parent_map[node_id]
+    
+    # If the parent is not a claim, it's not the pattern we're looking for
+    if parent_node.type != "주장":
+        return False
+    
+    # Check if this claim has a parent
+    parent_id = parent_node.id
+    if parent_id not in parent_map or not parent_map[parent_id]:
+        return False
+    
+    # Get the grandparent (could be rebuttal)
+    grandparent_node = parent_map[parent_id]
+    
+    # If grandparent is not a rebuttal, it's not the pattern
+    if grandparent_node.type != "반론":
+        return False
+    
+    # Check if the rebuttal has a parent
+    grandparent_id = grandparent_node.id
+    if grandparent_id not in parent_map or not parent_map[grandparent_id]:
+        return False
+    
+    # Get the great-grandparent (should be a claim)
+    great_grandparent_node = parent_map[grandparent_id]
+    
+    # If great-grandparent is a claim, we've found the pattern
+    return great_grandparent_node.type == "주장"
+
 def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, TreeNode]) -> List[TreeNode]:
     """Find nodes that were added since the previous tree state."""
     new_nodes = []
