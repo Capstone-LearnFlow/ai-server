@@ -624,7 +624,9 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
                     break
                 selected_reviews.append(reviews[i])
         
-        return selected_reviews
+        # Validate all reviews before returning them
+        validated_reviews = [validate_review_type(review) for review in selected_reviews]
+        return validated_reviews
         
     except Exception as e:
         print(f"Error parsing ranked reviews: {e}")
