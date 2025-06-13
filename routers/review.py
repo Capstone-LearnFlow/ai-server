@@ -22,7 +22,7 @@ async def review(request: ReviewRequest):
             request.filter_mode,
             request.use_unselected
         )
-        return {"data": ranked_reviews}
+        return {"data": ranked_reviews, "tree": request.tree}
     except ValidationError as ve:
         print("=== Validation Error in /review endpoint ===")
         print(f"Validation Error: {ve}")
