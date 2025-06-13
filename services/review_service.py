@@ -158,11 +158,12 @@ class ReviewService:
             combined_reviews = reviews + unselected_reviews
             print(f"Combined reviews (new + unselected): {len(combined_reviews)}")
         else:
-            # When not using unselected reviews, find all evidence nodes in the tree not previously used
-            print("Not using previously unselected reviews, generating new reviews for eligible evidence nodes")
+            # When not using unselected reviews, find all evidence nodes in the tree
+            # Don't filter by previously used evidence IDs when use_unselected is False
+            print("Not using previously unselected reviews, generating new reviews for all evidence nodes")
             all_evidence_nodes = []
             for node_id, node in current_tree_dict.items():
-                if node.type in ["근거"] and node.id not in used_evidence_ids:
+                if node.type in ["근거"]:
                     all_evidence_nodes.append(node)
             
             print(f"Found {len(all_evidence_nodes)} eligible evidence nodes in the current tree")
