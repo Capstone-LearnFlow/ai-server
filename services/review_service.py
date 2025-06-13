@@ -217,18 +217,24 @@ class ReviewService:
                 ranked_reviews.remove(best_review)
                 ranked_reviews.insert(0, best_review)
         
-        # Track selected evidence IDs from ranked reviews
-        new_used_evidence_ids = used_evidence_ids.copy()
-        for review in ranked_reviews:
-            parent_id = review.get("parent", "")
-            if parent_id and parent_id not in new_used_evidence_ids:
-                new_used_evidence_ids.append(parent_id)
-                print(f"Tracking newly used evidence ID: {parent_id}")
+        # Track selected evidence IDs from ranked reviews only if use_unselected is True
+        if use_unselected:
+            new_used_evidence_ids = used_evidence_ids.copy()
+            for review in ranked_reviews:
+                parent_id = review.get("parent", "")
+                if parent_id and parent_id not in new_used_evidence_ids:
+                    new_used_evidence_ids.append(parent_id)
+                    print(f"Tracking newly used evidence ID: {parent_id}")
+        else:
+            # When use_unselected is False, don't track evidence IDs
+            new_used_evidence_ids = []
+            print("Not tracking evidence IDs as use_unselected is False")
         
         # Update unselected reviews for future use
         new_unselected_reviews = self._calculate_unselected_reviews(combined_reviews, ranked_reviews)
         
-        # Store the current tree, unselected reviews and used evidence IDs for future comparison
+        # Store the current tree and unselected reviews for future comparison
+        # Only store evidence IDs if use_unselected is True
         self._save_state(student_id, assignment_id, deepcopy(tree), new_unselected_reviews, new_used_evidence_ids)
         
         return ranked_reviews
