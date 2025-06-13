@@ -4,7 +4,7 @@ import json
 from typing import List, Dict, Any, Optional, Tuple
 from copy import deepcopy
 from models import TreeNode
-from services.tree_utils import get_all_nodes, find_new_nodes
+from services.tree_utils import get_all_nodes, find_new_nodes, has_evidence_nodes_changed
 from services.openai_service import generate_review, rank_reviews
 
 
