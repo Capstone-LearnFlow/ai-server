@@ -177,6 +177,40 @@ async def enhance_review_with_search_results(initial_review: str, search_results
     # Determine review type for JSON structure
     review_type = "질문" if is_question else "반론"
     
+    # JSON example based on review type
+    json_example = ""
+    if is_question:
+        json_example = (
+            "```json\n"
+            "{\n"
+            "  \"tree\": {\n"
+            "    \"type\": \"질문\",\n"
+            "    \"content\": \"질문 내용\",\n"
+            "    \"summary\": \"질문 요약\"\n"
+            "  }\n"
+            "}\n"
+            "```\n"
+        )
+    else:
+        json_example = (
+            "```json\n"
+            "{\n"
+            "  \"tree\": {\n"
+            "    \"type\": \"반론\",\n"
+            "    \"content\": \"반론 내용\",\n"
+            "    \"summary\": \"반론 요약\",\n"
+            "    \"child\": [\n"
+            "      {\n"
+            "        \"type\": \"근거\",\n"
+            "        \"content\": \"근거 내용\",\n"
+            "        \"summary\": \"근거 요약\"\n"
+            "      }\n"
+            "    ]\n"
+            "  }\n"
+            "}\n"
+            "```\n"
+        )
+    
     prompt = (
         "다음은 논증 구조를 트리 형태로 표현한 JSON입니다. "
         "각 노드는 id, type, content, summary, child, sibling 등의 정보를 포함합니다. "
@@ -189,34 +223,7 @@ async def enhance_review_with_search_results(initial_review: str, search_results
         f"JSON 형식으로 작성해주세요. 학생이 이해하기 쉬운 언어로 작성해주세요.\n\n"
         f"중요: 질문 타입일 경우 절대 반론 구조를 포함하지 마세요. 질문은 단순히 질문만 포함해야 합니다.\n"
         f"반론 타입일 경우 질문 구조를 포함하지 마세요. 각 타입에 맞는 정확한 구조만 사용하세요.\n\n"
-        f"JSON 형식은 다음과 같습니다:\n"
-        f"- 질문인 경우:\n"
-        "```json\n"
-        "{\n"
-        "  \"tree\": {\n"
-        "    \"type\": \"질문\",\n"
-        "    \"content\": \"질문 내용\",\n"
-        "    \"summary\": \"질문 요약\"\n"
-        "  }\n"
-        "}\n"
-        "```\n"
-        f"- 반론인 경우:\n"
-        "```json\n"
-        "{\n"
-        "  \"tree\": {\n"
-        "    \"type\": \"반론\",\n"
-        "    \"content\": \"반론 내용\",\n"
-        "    \"summary\": \"반론 요약\",\n"
-        "    \"child\": [\n"
-        "      {\n"
-        "        \"type\": \"근거\",\n"
-        "        \"content\": \"근거 내용\",\n"
-        "        \"summary\": \"근거 요약\"\n"
-        "      }\n"
-        "    ]\n"
-        "  }\n"
-        "}\n"
-        "```\n"
+        f"JSON 형식은 다음과 같습니다:\n{json_example}"
     )
     
     response = await client.chat.completions.create(
