@@ -239,16 +239,25 @@ class ReviewService:
             # Get previous tree state
             previous_tree_dict = get_all_nodes(previous_tree)
             
-            # Find new nodes
-            new_nodes = find_new_nodes(current_tree_dict, previous_tree_dict)
+            # Check if evidence nodes have completely changed (none of the previous evidence exists in current tree)
+            evidence_nodes_changed = has_evidence_nodes_changed(current_tree_dict, previous_tree_dict)
             
-            # No fallback - if no new nodes, return empty list
-            # An empty list will cause the review generation process to fail gracefully
+            if evidence_nodes_changed:
+                print("Detected complete change in evidence nodes - treating all current evidence nodes as new")
+                # Handle case where all evidence nodes have changed - treat all current evidence as new
+                new_nodes = []
+                for node_id, node in current_tree_dict.items():
+                    if node.type == "근거":
+                        new_nodes.append(node)
+            else:
+                # Find new nodes using normal comparison
+                new_nodes = find_new_nodes(current_tree_dict, previous_tree_dict)
+                print(f"Found {len(new_nodes)} new nodes using standard comparison")
         else:
-            # First time seeing any tree, filter for nodes of type '근거' or '답변'
+            # First time seeing any tree, filter for nodes of type '근거'
             new_nodes = []
             for node_id, node in current_tree_dict.items():
-                if node.type in ["근거"]:
+                if node.type == "근거":
                     new_nodes.append(node)
         
         # Filter out nodes that already have anticipated counterarguments
