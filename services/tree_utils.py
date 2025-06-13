@@ -215,6 +215,39 @@ def is_in_claim_rebuttal_claim_pattern(node_id: str, parent_map: Dict[str, TreeN
     # If great-grandparent is a claim, we've found the pattern
     return great_grandparent_node.type == "주장"
 
+def has_evidence_nodes_changed(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, TreeNode]) -> bool:
+    """
+    Check if the evidence nodes have significantly changed between tree states.
+    Returns True if:
+    1. None of the previous evidence nodes exist in the current tree
+    2. All evidence nodes in the current tree are new (not in previous tree)
+    
+    This helps detect when a completely new set of evidence has been submitted.
+    """
+    # Get all evidence node IDs from previous tree
+    previous_evidence_ids = [
+        node_id for node_id, node in previous_tree.items() 
+        if node.type == "근거"
+    ]
+    
+    # Get all evidence node IDs from current tree
+    current_evidence_ids = [
+        node_id for node_id, node in current_tree.items() 
+        if node.type == "근거"
+    ]
+    
+    # If there are no evidence nodes in either tree, no significant change
+    if not previous_evidence_ids or not current_evidence_ids:
+        return False
+    
+    # Check if none of the previous evidence nodes exist in the current tree
+    previous_evidence_in_current = any(ev_id in current_tree for ev_id in previous_evidence_ids)
+    
+    # If none of the previous evidence nodes exist in the current tree,
+    # this indicates a significant change
+    return not previous_evidence_in_current
+
+
 def find_new_nodes(current_tree: Dict[str, TreeNode], previous_tree: Dict[str, TreeNode]) -> List[TreeNode]:
     """Find nodes that were added since the previous tree state."""
     new_nodes = []
