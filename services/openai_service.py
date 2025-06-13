@@ -630,11 +630,23 @@ async def rank_reviews(reviews: List[Dict[str, Any]], tree: TreeNode, review_num
     )
     
     try:
-        parsed_response = json.loads(response.choices[0].message.content)
-        ranked_indices = parsed_response.get("ranked_reviews", [])
-        
-        if not ranked_indices or len(ranked_indices) == 0:
-            print("Warning: No ranked indices returned, falling back to first reviews")
+        content = response.choices[0].message.content
+        if content is None:
+            print("Warning: Null content received from ranking API, falling back to first reviews")
+            return reviews[:review_num]
+            
+        try:
+            parsed_response = json.loads(content)
+            ranked_indices = parsed_response.get("ranked_reviews", [])
+            
+            if not ranked_indices or len(ranked_indices) == 0:
+                print("Warning: No ranked indices returned, falling back to first reviews")
+                return reviews[:review_num]
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error in rank_reviews: {e}")
+            content_preview = f"{content[:100]}...{content[-100:]}" if len(content) > 200 else content
+            print(f"Failed to parse ranking content (preview): {content_preview}")
+            print("Falling back to first reviews due to JSON parsing error")
             return reviews[:review_num]
         
         # Get the top ranked reviews based on the indices
