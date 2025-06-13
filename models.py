@@ -73,6 +73,7 @@ class ReviewResponseData(BaseModel):
 
 class ReviewResponse(BaseModel):
     data: List[ReviewResponseData]
+    tree: Optional[TreeNode] = None
 
 
 # Models for /reset endpoint
