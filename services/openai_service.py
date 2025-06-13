@@ -245,7 +245,22 @@ async def enhance_review_with_search_results(initial_review: str, search_results
             }
         }
     else:
-        review_data = json.loads(content)
+        try:
+            review_data = json.loads(content)
+        except json.JSONDecodeError as e:
+            # Log the error and provide the first and last 100 characters of the content for debugging
+            print(f"JSON parsing error in enhance_review_with_search_results: {e}")
+            content_preview = f"{content[:100]}...{content[-100:]}" if len(content) > 200 else content
+            print(f"Failed to parse content (preview): {content_preview}")
+            
+            # Fallback for malformed JSON
+            review_data = {
+                "tree": {
+                    "type": "질문" if is_question else "반론",
+                    "content": "JSON 형식으로 응답을 파싱하는 중 오류가 발생했습니다.",
+                    "summary": "JSON 파싱 오류"
+                }
+            }
     
     review_data["parent"] = node.id
     
